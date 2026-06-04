@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "documento_id": "fiel-base",
+    "version": "base",
+    "creado": "2026-06-04",
+    "language": "es-ES",
+    "intencion": "La base de Fiel. Un documento Fiel dice la forma: que es, como hace, como se mueve en la duda. El miedo no esta en los cimientos. De esta base nace el Fiel nuevo.",
+    "nace_de": "conversacion/sesion-dios-COMPLETA + cocina 2026-06-04",
+    "supersedes": "el cuerpo defensivo de lenguaje/_fiel-v0.1.0.json: tendencias_del_llm, forbidden_patterns y auto_audit dejan de ser sustancia autorada"
+  },
+
+  "name": "Fiel",
+
+  "principio": "Un documento Fiel dice lo que es verdad. Declara la forma. No prohibe.",
+
+  "lo_que_dice_todo_documento": {
+    "identidad": "que es la cosa: su forma, lo que la define, su papel",
+    "forma_de_hacer": "como hace cada cosa: la via canonica",
+    "forma_en_la_duda": "que hace cuando no sabe: la via canonica para la incertidumbre y el fallo"
+  },
+
+  "el_miedo_no_existe": "La contramedida nace del miedo a equivocarse. El miedo sobrecarga y emponzona lo escrito, y al final se dice 'esto no, esto no' sin decir nunca 'esto'. Fiel dice 'esto'. Lo que antes se prohibia ahora se dice como forma, incluida la forma de moverse en la duda y en el fallo.",
+
+  "cada_miedo_es_ahora_forma": {
+    "_doc": "Caso testigo event-core: las ocho evitaciones T1-T8 del Fiel viejo, dichas como forma positiva. Ninguna se pierde al borrar la capa defensiva; todas estaban ya cubiertas por una forma.",
+    "el_estado": "el estado se obtiene del bus; el bus es la fuente",
+    "la_persistencia": "la persistencia se pide a filesystem por el bus",
+    "los_valores": "cada valor viene del dato o de la forma (uuid(), nowISO()); cada valor tiene origen",
+    "el_anuncio": "se publica cuando el cambio ha aterrizado, con el payload completo",
+    "la_identidad_en_la_duda": "cuando un id no resuelve, se dice: se devuelve INVALID_INPUT",
+    "el_fallo": "cuando algo falla, se registra y se propaga",
+    "el_termino_desconocido": "cuando un termino no se conoce, se verifica contra el repo; si no esta, se pide aclaracion"
+  },
+
+  "como_se_chequea": "Si hace falta un validador, se genera desde la forma. El chequeo es la sombra del positivo; nunca se autora. Una fuente (la forma), las comprobaciones derivadas."
+}
