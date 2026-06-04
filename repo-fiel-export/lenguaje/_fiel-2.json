@@ -1,0 +1,49 @@
+{
+  "_meta": {
+    "documento_id": "_fiel-2",
+    "version": "2.0.0",
+    "estado": "en crecimiento: 1 primitiva nueva cristalizada",
+    "creado": "2026-06-04",
+    "language": "es-ES",
+    "base_ref": "lenguaje/_fiel-base.json",
+    "intencion": "La definicion de Fiel 2. Crece de abajo arriba: una primitiva nueva entra cuando dos contratos distintos la piden. Dice la forma; el chequeo se genera de la forma. Hereda de Fiel 1 el esqueleto positivo; deja fuera la capa defensiva."
+  },
+
+  "name": "Fiel",
+
+  "fundamento": "lenguaje/_fiel-base.json. Un documento dice la forma: identidad (que es), forma de hacer (como hace), forma en la duda (que hace cuando no sabe). El razon acompana donde pesa. El miedo no esta en los cimientos.",
+
+  "hereda_de_fiel_1": {
+    "_doc": "el esqueleto positivo de Fiel 1 sigue; dice estructura, no guarda contra el error",
+    "conserva": ["abstract_class", "concrete_class", "property", "method", "constructor", "param", "invariant", "pseudo_step (acciones de enum cerrado)", "bus_connection"],
+    "deja_fuera": ["tendencias_del_llm", "forbidden_patterns", "forbidden_patterns_meta", "auto_audit_protocol"]
+  },
+
+  "como_crece": "una primitiva nueva entra cuando dos contratos distintos la piden. Variedad de forma pesa mas que cantidad de testigos. Con un solo testigo se usa localmente pero no se define aqui. El razon y el en_la_duda no son primitivas: son la base en uso.",
+
+  "primitivas_cristalizadas": [
+    {
+      "type": "closed_enum",
+      "_doc": "el conjunto cerrado de valores canonicos de algo. Cada valor es del value_type. Una entrada es el valor pelado, o el valor con su metadata.",
+      "shape": {
+        "type": "closed_enum",
+        "value_type": "tipo de los valores: integer | string | string UPPER_SNAKE | ...",
+        "se_extiende": "como entra un valor nuevo (por PR | cerrado); opcional",
+        "razon": "por que el conjunto es cerrado; opcional",
+        "entries": "array; cada entrada es un valor pelado, o un objeto { value, ...metadata }"
+      },
+      "el_chequeo": "se genera del conjunto: un valor pertenece o no pertenece. La prohibicion no se autora; es la sombra del conjunto.",
+      "testigos": [
+        { "contrato": "errors", "forma": "clase con metodos", "uso": "status_canonicos (integer + metadata clase/recuperable); codigos_dominio e infraestructura (UPPER_SNAKE + status + lleva)" },
+        { "contrato": "naming", "forma": "catalogo por idioma", "uso": "verbos_de_ciclo_de_vida, verbos_compuestos, pistas_de_directorio, idiomas (valores pelados)" }
+      ],
+      "_nota": "dos testigos cross-shape (clase con metodos / catalogo pelado): variedad de forma confirma que captura lo esencial"
+    }
+  ],
+
+  "primitivas_emergiendo": {
+    "_doc": "un testigo cada una; entran cuando un segundo contrato distinto las pida",
+    "forma": { "_doc": "la forma canonica de un identificador: plantilla + patron + alfabeto + caso", "testigos": ["naming: forma_del_nombre"] },
+    "antes_despues": { "_doc": "pre/post de una operacion: que se cumple antes, que despues", "testigos": ["errors: construir_respuesta, construir_error"] }
+  }
+}
