@@ -1,5 +1,15 @@
 # Paradigma del sistema — Event-Core
 
+## El idioma del repo — base que no se negocia
+
+**Los documentos se escriben en Fiel. La prosa vive solo en el chat.**
+
+El contenido canónico del repo —contratos, schemas, análisis, agentes, propuestas— se plasma en **Fiel** (JSON + OOP + pseudocódigo acotado; definición en `lenguaje/_fiel-v0.1.0.json`). La **prosa en lenguaje natural es el modo conversacional con el humano, no el modo de plasmar**: vive en el chat y no se commitea como artefacto.
+
+Razón: la prosa deja al LLM divagar y el documento degenera en la siguiente sesión —se lee como "comprensión" y se recompone con ruido. Fiel se lee literal y no se recompone. El formato es parte de la disciplina, no decoración.
+
+Los `.md` que quedan en el repo (este `CLAUDE.md`, los `README`, los wrappers de skills y agentes como `notario.md`) son **índices mínimos que apuntan a los documentos Fiel** —no contenido canónico en prosa. Si tienes que dejar un artefacto, va en Fiel; si es una explicación para un humano, va en el chat.
+
 ## La regla que no se rompe
 
 **Emite evento. Quien sabe, hace. Tú no sabes cómo.**
