@@ -2,7 +2,7 @@
   "_meta": {
     "documento_id": "_fiel-2",
     "version": "2.0.0",
-    "estado": "en crecimiento: 1 primitiva nueva cristalizada",
+    "estado": "en crecimiento: 2 primitivas nuevas cristalizadas",
     "creado": "2026-06-04",
     "language": "es-ES",
     "base_ref": "lenguaje/_fiel-base.json",
@@ -35,15 +35,40 @@
       "el_chequeo": "se genera del conjunto: un valor pertenece o no pertenece. La prohibicion no se autora; es la sombra del conjunto.",
       "testigos": [
         { "contrato": "errors", "forma": "clase con metodos", "uso": "status_canonicos (integer + metadata clase/recuperable); codigos_dominio e infraestructura (UPPER_SNAKE + status + lleva)" },
-        { "contrato": "naming", "forma": "catalogo por idioma", "uso": "verbos_de_ciclo_de_vida, verbos_compuestos, pistas_de_directorio, idiomas (valores pelados)" }
+        { "contrato": "naming", "forma": "catalogo por idioma", "uso": "verbos_de_ciclo_de_vida, verbos_compuestos, pistas_de_directorio, idiomas (valores pelados)" },
+        { "contrato": "events", "forma": "catalogo con metadata", "uso": "categorias (string + qos + retain por entrada)" }
       ],
-      "_nota": "dos testigos cross-shape (clase con metodos / catalogo pelado): variedad de forma confirma que captura lo esencial"
+      "_nota": "tres testigos cross-shape (clase con metodos / catalogo pelado / catalogo con metadata): captura lo esencial"
+    },
+    {
+      "type": "forma",
+      "_doc": "la forma canonica de un identificador: como se escribe y de que esta hecho.",
+      "shape": {
+        "type": "forma",
+        "plantilla": "la forma legible con placeholders, ej: <module>.<entity>.<verb>",
+        "patron": "el patron preciso (regex); opcional",
+        "alfabeto": "los caracteres permitidos, ej: a-z, digitos, guion; opcional",
+        "compuestos": "el caso de los compuestos, ej: kebab-case; opcional",
+        "razon": "opcional"
+      },
+      "el_chequeo": "se genera de la forma: un identificador encaja o no. La prohibicion (no-ASCII, imperativo) es la sombra, no se autora.",
+      "testigos": [
+        { "contrato": "naming", "uso": "forma_del_nombre (el nombre de un evento)" },
+        { "contrato": "events", "uso": "forma_del_topic y forma_del_nombre (el topic MQTT y el nombre)" }
+      ],
+      "_nota": "dos identificadores distintos (nombre / topic) con la misma forma: confirma el grano"
     }
   ],
 
   "primitivas_emergiendo": {
-    "_doc": "un testigo cada una; entran cuando un segundo contrato distinto las pida",
-    "forma": { "_doc": "la forma canonica de un identificador: plantilla + patron + alfabeto + caso", "testigos": ["naming: forma_del_nombre"] },
-    "antes_despues": { "_doc": "pre/post de una operacion: que se cumple antes, que despues", "testigos": ["errors: construir_respuesta, construir_error"] }
+    "_doc": "entran cuando un segundo contrato distinto las pida con la misma claridad",
+    "antes_despues": {
+      "_doc": "pre/post de una operacion: que se cumple antes, que despues",
+      "testigos": [
+        "errors: construir_respuesta, construir_error (antes y despues)",
+        "events: publish_semantics (solo el despues; testigo parcial)"
+      ],
+      "_nota": "espera un segundo testigo limpio con antes y despues"
+    }
   }
 }
