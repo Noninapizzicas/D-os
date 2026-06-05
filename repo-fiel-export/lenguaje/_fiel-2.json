@@ -21,6 +21,12 @@
 
   "como_crece": "una primitiva nueva entra cuando dos contratos distintos la piden. Variedad de forma pesa mas que cantidad de testigos. Con un solo testigo se usa localmente pero no se define aqui. El razon y el en_la_duda no son primitivas: son la base en uso.",
 
+  "lo_que_no_entra_como_primitiva": {
+    "_doc": "no toda estructura es un grano",
+    "regla": "lo que ya se dice en JSON plano no entra como primitiva; solo entra lo que sin primitiva no se podria decir (como closed_enum: un conjunto cerrado con pertenencia). Un objeto descrito campo a campo es JSON nativo.",
+    "testigos": ["events: payload.campos", "persistence: declaracion_en_module_json.campos"]
+  },
+
   "primitivas_cristalizadas": [
     {
       "type": "closed_enum",
