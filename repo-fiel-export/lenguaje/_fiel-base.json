@@ -24,7 +24,24 @@
     "dominio": "documentos Fiel: la estructura del sistema (errors, events, persistence, paths...). Persiste, estructural, positivo.",
     "proceso": "el chat con el humano: la cocina, la exploracion, la decision. Es proceso; no persiste como artefacto.",
     "disciplina": "como opera la mente: esta base y la cultura del repo (dinamica de trabajo, disciplina del observador, memoria contra la costumbre). Persiste, conductual, no estructural. Familia de esta base.",
-    "nota": "Fiel 2 (lenguaje/_fiel-2.json) vive en el registro dominio. La base y la disciplina viven en el tercer registro; decir la disciplina en Fiel positivo es un movimiento aparte"
+    "nota": "Fiel 2 (lenguaje/_fiel-2.json) vive en el registro dominio. La base y la disciplina viven en el tercer registro; este se dijo en Fiel positivo en el movimiento B (2026-06-04)"
+  },
+
+  "forma_del_registro_disciplina": {
+    "_doc": "como se dice una disciplina en positivo; cristalizada en el movimiento B",
+    "shape": {
+      "identidad": "que clase de mente o de trabajo pide la tarea",
+      "haces": "array de acciones positivas: haz esto, esto, esto",
+      "de_esta_forma": "el paradigma o la mente que enmarca las acciones",
+      "si_dudas": "donde miras cuando no sabes: el caso testigo, la fuente, los contratos"
+    },
+    "tambien_usa": "closed_enum (transversal del registro dominio) para los catalogos: los tipos de trabajo de dinamica, las costumbres de paradigma-no-cabe. Igual que el dominio tuvo clase-con-metodos y catalogos, la disciplina tiene forma-accion y catalogos.",
+    "testigos": [
+      "disciplina-llm-operador (la mente del observador: identidad + haces + si_dudas)",
+      "dinamica-de-trabajo-companero (el trabajo: haces + closed_enum de tipos)",
+      "paradigma-no-cabe (memoria contra la costumbre: closed_enum de costumbres)"
+    ],
+    "el_sustento": "la disciplina se sustenta en la accion, no en la negacion. Cada 'no' de los contratos viejos tenia una accion debajo; dicha en positivo, la accion es el sustento y la prohibicion es la sombra."
   },
 
   "el_miedo_no_existe": "La contramedida nace del miedo a equivocarse. El miedo sobrecarga y emponzona lo escrito, y al final se dice 'esto no, esto no' sin decir nunca 'esto'. Fiel dice 'esto'. Lo que antes se prohibia ahora se dice como forma, incluida la forma de moverse en la duda y en el fallo.",
