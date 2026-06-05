@@ -19,6 +19,14 @@
     "forma_en_la_duda": "que hace cuando no sabe: la via canonica para la incertidumbre y el fallo"
   },
 
+  "tres_registros": {
+    "_doc": "donde vive cada cosa en el repo",
+    "dominio": "documentos Fiel: la estructura del sistema (errors, events, persistence, paths...). Persiste, estructural, positivo.",
+    "proceso": "el chat con el humano: la cocina, la exploracion, la decision. Es proceso; no persiste como artefacto.",
+    "disciplina": "como opera la mente: esta base y la cultura del repo (dinamica de trabajo, disciplina del observador, memoria contra la costumbre). Persiste, conductual, no estructural. Familia de esta base.",
+    "nota": "Fiel 2 (lenguaje/_fiel-2.json) vive en el registro dominio. La base y la disciplina viven en el tercer registro; decir la disciplina en Fiel positivo es un movimiento aparte"
+  },
+
   "el_miedo_no_existe": "La contramedida nace del miedo a equivocarse. El miedo sobrecarga y emponzona lo escrito, y al final se dice 'esto no, esto no' sin decir nunca 'esto'. Fiel dice 'esto'. Lo que antes se prohibia ahora se dice como forma, incluida la forma de moverse en la duda y en el fallo.",
 
   "cada_miedo_es_ahora_forma": {
