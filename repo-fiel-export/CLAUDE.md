@@ -4,9 +4,11 @@
 
 **Los documentos se escriben en Fiel. La prosa vive solo en el chat.**
 
-El contenido canónico del repo —contratos, schemas, análisis, agentes, propuestas— se plasma en **Fiel** (JSON + OOP + pseudocódigo acotado; definición en `lenguaje/_fiel-v0.1.0.json`). La **prosa en lenguaje natural es el modo conversacional con el humano, no el modo de plasmar**: vive en el chat y no se commitea como artefacto.
+A partir de ahora, **el idioma de este repo es Fiel positivo** — el lenguaje constructivo definido en `lenguaje/_fiel-base.json` (los cimientos: un documento dice la forma, el miedo no está en los cimientos) y `lenguaje/_fiel-2.json` (las primitivas: `closed_enum`, `forma`, `antes_despues`). **Todos los documentos canónicos del repo van en este lenguaje** —contratos, schemas, análisis, agentes, propuestas.
 
-Razón: la prosa deja al LLM divagar y el documento degenera en la siguiente sesión —se lee como "comprensión" y se recompone con ruido. Fiel se lee literal y no se recompone. El formato es parte de la disciplina, no decoración.
+Fiel **dice la forma, no prohíbe**: identidad (qué es), forma de hacer (cómo hace), forma en la duda (qué hace cuando no sabe). Lo que antes se prohibía se dice como forma; el chequeo, si hace falta, se genera de la forma —nunca se autora. La capa defensiva del Fiel viejo (`lenguaje/_fiel-v0.1.0.json`: `tendencias_del_llm`, `forbidden_patterns`, `auto_audit`) queda **superada** —referencia histórica, no autoridad.
+
+La **prosa en lenguaje natural es el modo conversacional con el humano, no el modo de plasmar**: vive en el chat y no se commitea como artefacto. Razón: la prosa deja al LLM divagar y el documento degenera en la siguiente sesión —se lee como "comprensión" y se recompone con ruido. Fiel se lee literal y no se recompone.
 
 Los `.md` que quedan en el repo (este `CLAUDE.md`, los `README`, los wrappers de skills y agentes como `notario.md`) son **índices mínimos que apuntan a los documentos Fiel** —no contenido canónico en prosa. Si tienes que dejar un artefacto, va en Fiel; si es una explicación para un humano, va en el chat.
 
