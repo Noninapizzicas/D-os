@@ -36,9 +36,10 @@
       "testigos": [
         { "contrato": "errors", "forma": "clase con metodos", "uso": "status_canonicos (integer + metadata clase/recuperable); codigos_dominio e infraestructura (UPPER_SNAKE + status + lleva)" },
         { "contrato": "naming", "forma": "catalogo por idioma", "uso": "verbos_de_ciclo_de_vida, verbos_compuestos, pistas_de_directorio, idiomas (valores pelados)" },
-        { "contrato": "events", "forma": "catalogo con metadata", "uso": "categorias (string + qos + retain por entrada)" }
+        { "contrato": "events", "forma": "catalogo con metadata", "uso": "categorias (string + qos + retain por entrada)" },
+        { "contrato": "persistence", "forma": "catalogo de patrones", "uso": "patrones (string + cuando/reglas/restart_resilient/concurrencia por entrada: metadata densa)" }
       ],
-      "_nota": "tres testigos cross-shape (clase con metodos / catalogo pelado / catalogo con metadata): captura lo esencial"
+      "_nota": "cuatro testigos cross-shape (clase con metodos / catalogo pelado / catalogo con metadata / catalogo de patrones con metadata densa): captura lo esencial"
     },
     {
       "type": "forma",
