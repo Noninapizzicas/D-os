@@ -27,21 +27,22 @@
     "nota": "Fiel 2 (lenguaje/_fiel-2.json) vive en el registro dominio. La base y la disciplina viven en el tercer registro; este se dijo en Fiel positivo en el movimiento B (2026-06-04)"
   },
 
-  "forma_del_registro_disciplina": {
-    "_doc": "como se dice una disciplina en positivo; cristalizada en el movimiento B",
-    "shape": {
-      "identidad": "que clase de mente o de trabajo pide la tarea",
-      "haces": "array de acciones positivas: haz esto, esto, esto",
-      "de_esta_forma": "el paradigma o la mente que enmarca las acciones",
-      "si_dudas": "donde miras cuando no sabes: el caso testigo, la fuente, los contratos"
+  "el_registro_disciplina_usa_la_forma_de_la_base": {
+    "_doc": "B no creo una forma nueva: el registro disciplina usa la misma forma de la base, con superficie conductual. Cristalizado y refinado en el movimiento B",
+    "como_aparece": {
+      "identidad": "que clase de mente o de trabajo pide la tarea (igual que en la base)",
+      "forma_de_hacer": "aparece como haces[] -una lista de acciones- porque el hacer conductual es lista, no metodos con pre/post",
+      "forma_en_la_duda": "aparece como si_dudas: donde miras cuando no sabes (el caso testigo, la fuente, los contratos)",
+      "de_esta_forma": "nota de encuadre (el paradigma, la mente), como el razon; no es un pilar nuevo ni una primitiva"
     },
-    "tambien_usa": "closed_enum (transversal del registro dominio) para los catalogos: los tipos de trabajo de dinamica, las costumbres de paradigma-no-cabe. Igual que el dominio tuvo clase-con-metodos y catalogos, la disciplina tiene forma-accion y catalogos.",
+    "tambien_usa": "closed_enum (transversal) para sus catalogos: los tipos de trabajo de dinamica, las costumbres de paradigma-no-cabe.",
     "testigos": [
-      "disciplina-llm-operador (la mente del observador: identidad + haces + si_dudas)",
+      "disciplina-llm-operador (la mente del observador)",
       "dinamica-de-trabajo-companero (el trabajo: haces + closed_enum de tipos)",
       "paradigma-no-cabe (memoria contra la costumbre: closed_enum de costumbres)"
     ],
-    "el_sustento": "la disciplina se sustenta en la accion, no en la negacion. Cada 'no' de los contratos viejos tenia una accion debajo; dicha en positivo, la accion es el sustento y la prohibicion es la sombra."
+    "el_sustento": "la disciplina se sustenta en la accion, no en la negacion. Cada 'no' tenia una accion debajo; la accion es el sustento, la prohibicion es la sombra.",
+    "lo_que_demuestra": "la forma de la base es universal -sirve al dominio y a la disciplina; closed_enum es la unica primitiva transversal; ninguna primitiva nueva nace en el registro disciplina."
   },
 
   "el_miedo_no_existe": "La contramedida nace del miedo a equivocarse. El miedo sobrecarga y emponzona lo escrito, y al final se dice 'esto no, esto no' sin decir nunca 'esto'. Fiel dice 'esto'. Lo que antes se prohibia ahora se dice como forma, incluida la forma de moverse en la duda y en el fallo.",
