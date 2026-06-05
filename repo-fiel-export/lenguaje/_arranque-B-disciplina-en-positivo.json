@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "documento_id": "_arranque-B-disciplina-en-positivo",
+    "tipo": "testigo de movimiento aplazado",
+    "estado": "aplazado, no perdido",
+    "creado": "2026-06-04",
+    "language": "es-ES",
+    "nace_de": "cierre del experimento de conversion de dominio (errors..storage-layout) 2026-06-04"
+  },
+
+  "que_es_B": "decir el registro disciplina en Fiel positivo. La base (_fiel-base.json) absorbe a disciplina-llm-operador como prima; los tres contratos culturales (disciplina-llm-operador, dinamica-de-trabajo-companero, paradigma-no-cabe) se dicen en positivo, capa hermana de la base, no piedra de dominio.",
+
+  "por_que_es_aparte": "el experimento de dominio cerro completo (6/9 contratos, 3 primitivas, 3 registros nombrados). B es otro registro, otra mente para cocinar. Se abre con intencion, no por inercia del flow. El filtro doble que protegio el dominio (no se puede decir en JSON plano + dolor real) gobierna tambien aqui.",
+
+  "material_preparado": {
+    "base": "lenguaje/_fiel-base.json (tres_registros nombrados; la base ya vive en el registro disciplina)",
+    "lenguaje": "lenguaje/_fiel-2.json (closed_enum, forma, antes_despues cristalizadas en el registro dominio)",
+    "a_decir_en_positivo": [
+      "contratos-referenciados/disciplina-llm-operador.contract.json",
+      "contratos-referenciados/dinamica-de-trabajo-companero.contract.json",
+      "contratos-referenciados/paradigma-no-cabe.contract.json"
+    ]
+  },
+
+  "lo_que_se_observo_y_espera_a_B": {
+    "closed_enum_cruza_registros": "closed_enum aparece dentro de los tres culturales (paradigma-no-cabe.entries, dinamica.clasificacion_de_trabajo.tipos) sin volverlos dominio. Su 6o testigo real -metadata cultural en vez de tecnica- se realiza cuando B diga paradigma-no-cabe en Fiel.",
+    "regla_propia": "B tiene su propia regla bottom-up: que primitivas emergen del registro disciplina? una cláusula con dos casos testigo? El registro dominio dio closed_enum/forma/antes_despues; el registro disciplina puede dar otras, o ninguna nueva."
+  },
+
+  "la_prueba": "si Fiel constructivo aguanta el registro disciplina (no solo el dominio), aguanta de verdad. Si no aguanta, eso tambien es informacion: ana cierra honesto y el registro disciplina se queda como esta. Esa salida queda abierta.",
+
+  "como_arrancar": "cuando ana y el humano abran B con intencion. Cocina con ana (horizonte abierto), notario plasma cuando este cerrado, mismo filtro doble y mismo umbral de 2 testigos cross-shape."
+}
