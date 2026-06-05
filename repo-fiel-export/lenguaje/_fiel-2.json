@@ -19,13 +19,7 @@
     "deja_fuera": ["tendencias_del_llm", "forbidden_patterns", "forbidden_patterns_meta", "auto_audit_protocol"]
   },
 
-  "como_crece": "una primitiva nueva entra cuando dos contratos distintos la piden. Variedad de forma pesa mas que cantidad de testigos. Con un solo testigo se usa localmente pero no se define aqui. El razon y el en_la_duda no son primitivas: son la base en uso.",
-
-  "lo_que_no_entra_como_primitiva": {
-    "_doc": "no toda estructura es un grano",
-    "regla": "lo que ya se dice en JSON plano no entra como primitiva; solo entra lo que sin primitiva no se podria decir (como closed_enum: un conjunto cerrado con pertenencia). Un objeto descrito campo a campo es JSON nativo.",
-    "testigos": ["events: payload.campos", "persistence: declaracion_en_module_json.campos"]
-  },
+  "como_crece": "una primitiva nueva entra cuando algo no se puede decir en JSON plano y dos contratos distintos lo piden. Variedad de forma pesa mas que cantidad de testigos. Con un solo testigo se usa localmente hasta que un segundo contrato distinto lo confirme. El razon y el en_la_duda son la base en uso.",
 
   "primitivas_cristalizadas": [
     {
