@@ -46,3 +46,16 @@ CASOS LÍMITE:
   - subclase no implementa onLoad → LANZA al construir
   - verb fuera de whitelist → INVALID_INPUT
 ```
+
+## Topología MQTT — cómo se mapea un módulo al bus
+
+```
+DECLARATIVO (module.json → el loader lo cablea):
+  events.subscribes[].name  →  bus.subscribe(...)  →  core/{core-id}/{categoria}/{detalle}
+
+EMISIÓN (helper emit):
+  emit("recipe","created",p) → recipe.recipe.created → core/{core-id}/events/recipe/created  (QoS 1)
+
+I/O (helpers leer/listar/escribir → mqttRequest):
+  leer(path) → ui/request/filesystem/read  +  ui/response/{correlation_id}   (QoS 1)
+```
