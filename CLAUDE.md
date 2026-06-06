@@ -1,8 +1,12 @@
-# Pseudocódigo — `ModuloEventCore`
+# CLAUDE.md
+
+Guía del repositorio para Claude Code. Idioma del repo: **Fiel positivo (Fiel 2)**;
+todos los documentos en español.
+
+## Pseudocódigo — `ModuloEventCore`
 
 Especificación agnóstica al lenguaje de la clase base abstracta de todo módulo
-del sistema event-core. Traducible 1:1 a la implementación de
-[`modulo-event-core.js`](./modulo-event-core.js).
+del sistema event-core. Traducible 1:1 a [`event-core/modulo-event-core.js`](./event-core/modulo-event-core.js).
 
 ```
 ABSTRACTA ModuloEventCore EXTIENDE BaseModule
