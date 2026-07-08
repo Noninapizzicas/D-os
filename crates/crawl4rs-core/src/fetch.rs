@@ -7,7 +7,9 @@
 
 use async_trait::async_trait;
 
-use crate::error::{Error, Result};
+#[cfg(not(feature = "browser"))]
+use crate::error::Error;
+use crate::error::Result;
 
 /// Una página descargada, sin procesar.
 #[derive(Debug, Clone)]
@@ -57,27 +59,30 @@ impl Fetcher for StaticFetcher {
     }
 }
 
-/// Fetcher basado en navegador headless (Chromium vía CDP).
+/// Fetcher basado en navegador headless (stub sin la feature `browser`).
 ///
-/// Marcador de posición para la Fase 1 de la hoja de ruta. Hoy devuelve
-/// [`Error::NotImplemented`].
+/// La implementación real vive en [`crate::browser::BrowserFetcher`]; este
+/// marcador sólo existe en builds compilados con `--no-default-features`.
+#[cfg(not(feature = "browser"))]
 #[derive(Debug, Default, Clone)]
 pub struct BrowserFetcher {
     _private: (),
 }
 
+#[cfg(not(feature = "browser"))]
 impl BrowserFetcher {
-    /// Crea el fetcher (aún sin backend real).
+    /// Crea el fetcher (sin backend en este build).
     pub fn new() -> Self {
         Self::default()
     }
 }
 
+#[cfg(not(feature = "browser"))]
 #[async_trait]
 impl Fetcher for BrowserFetcher {
     async fn fetch(&self, _url: &str) -> Result<FetchedPage> {
         Err(Error::NotImplemented(
-            "BrowserFetcher (chromiumoxide) llega en la Fase 1",
+            "compilado sin la feature `browser`; actívala para usar Chromium",
         ))
     }
 }

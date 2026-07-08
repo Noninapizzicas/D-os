@@ -11,10 +11,13 @@ RAM, con una imagen Docker < 20 MB.
 
 ## Estado actual
 
-Este repositorio está en la **Fase 0 → 2** de la hoja de ruta. Lo que ya
+Este repositorio está en la **Fase 1 → 3** de la hoja de ruta. Lo que ya
 funciona hoy, compilando y con tests en verde:
 
 - 🧱 **Workspace** de Cargo con los 7 subcrates de la arquitectura.
+- 🌐 **Navegador real vía CDP** (`chromiumoxide`): `BrowserPool` con límite de
+  pestañas concurrentes, `BrowserFetcher` de arranque perezoso y
+  `SessionManager` que persiste cookies y `localStorage` por perfil.
 - 🔤 **Pipeline de Markdown** real: `HTML → limpieza → markdown → fit_markdown`
   (encabezados, listas, citas, código, enlaces, imágenes), con eliminación de
   `script`/`style`/`nav`/`footer`.
@@ -25,9 +28,9 @@ funciona hoy, compilando y con tests en verde:
 - 🗃️ **Caché LRU** en memoria.
 - 🖥️ **CLI** `crawl4rs` con los subcomandos `crawl`, `deep`, `serve`, `config`.
 
-Marcadores de posición documentados para las fases siguientes: navegador
-headless (`chromiumoxide`), caché en disco (`sled`), stealth (`chaser-oxide`),
-API (`axum`) y extracción con LLM local (`candle`).
+Marcadores de posición documentados para las fases siguientes: caché en disco
+(`sled`), stealth (`chaser-oxide`), API (`axum`) y extracción con LLM local
+(`candle`).
 
 ## Instalación y uso
 
@@ -35,22 +38,25 @@ API (`axum`) y extracción con LLM local (`candle`).
 # Compilar
 cargo build --release
 
-# Procesar un HTML local → Markdown
-crawl4rs crawl https://ejemplo.com --html-file pagina.html
+# Crawl real: lanza Chromium headless, navega y convierte a Markdown
+crawl4rs crawl https://ejemplo.com
 
 # Sólo el "fit_markdown", filtrado por relevancia a una consulta
-crawl4rs crawl https://ejemplo.com --html-file pagina.html --fit \
-    --query "rust async runtime"
+crawl4rs crawl https://ejemplo.com --fit --query "rust async runtime"
+
+# Procesar un HTML local sin lanzar navegador
+crawl4rs crawl https://ejemplo.com --html-file pagina.html
 
 # Salida estructurada en JSON
-crawl4rs crawl https://ejemplo.com --html-file pagina.html --json
+crawl4rs crawl https://ejemplo.com --json
 
 # Ver la configuración por defecto
 crawl4rs config
 ```
 
-> El fetcher de red vía navegador (`crawl <url>` sin `--html-file`) llega en la
-> Fase 1. Hasta entonces, se procesa HTML ya disponible con `--html-file`.
+> Se necesita un Chromium/Chrome instalado. Se busca automáticamente en rutas
+> conocidas; puede fijarse con `CRAWL4RS_CHROME=/ruta/al/chromium`. Los builds
+> sin navegador son posibles con `--no-default-features` en `crawl4rs-core`.
 
 ### Como biblioteca
 
@@ -105,6 +111,9 @@ Consulta la hoja de ruta completa en [`ROADMAP.md`](./ROADMAP.md).
 cargo test          # tests unitarios y doctests
 cargo clippy --all-targets
 cargo fmt --all --check
+
+# Tests de integración con un Chromium real (no corren en CI)
+cargo test -p crawl4rs-core -- --ignored
 ```
 
 ## Licencia

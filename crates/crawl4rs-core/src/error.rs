@@ -26,6 +26,10 @@ pub enum Error {
     #[error("fallo en el pipeline de markdown: {0}")]
     Markdown(String),
 
+    /// Fallo del navegador headless (lanzamiento, CDP, timeout).
+    #[error("fallo del navegador: {0}")]
+    Browser(String),
+
     /// Funcionalidad planificada pero aún no implementada (ver hoja de ruta).
     #[error("no implementado todavía: {0}")]
     NotImplemented(&'static str),

@@ -9,12 +9,20 @@ repositorio.
 - README con visión y ejemplos.
 - Logging estructurado con `tracing`.
 
-## Fase 1 — Navegador y CDP · 🔜 siguiente
-- Integrar `chromiumoxide` en `BrowserFetcher`.
-- `BrowserPool`: lanzar, reutilizar y cerrar instancias.
-- Navegación básica: `goto`, `wait_for`, `content()`.
-- `SessionManager`: cookies y `localStorage`.
-- Fallback a `thirtyfour` (WebDriver) si `chromiumoxide` es inestable.
+## Fase 1 — Navegador y CDP · ✅ hecho
+- [x] Integrar `chromiumoxide` en `BrowserFetcher` (feature `browser`, activa
+      por defecto; desactivable para builds ligeros).
+- [x] `BrowserPool`: una instancia de Chromium reutilizada, límite de pestañas
+      concurrentes por semáforo, perfil temporal único por pool y cierre
+      ordenado.
+- [x] Navegación básica: `goto`, espera de carga (`wait_for_navigation`),
+      `content()`, timeout configurable.
+- [x] `SessionManager`: persistencia de cookies y `localStorage` por perfil en
+      disco (JSON), verificada entre dos navegadores distintos.
+- [x] Tests de integración con Chromium real (`cargo test -- --ignored`);
+      detección del ejecutable vía `$CRAWL4RS_CHROME` o rutas conocidas.
+- [ ] Fallback a `thirtyfour` (WebDriver) si `chromiumoxide` es inestable.
+- [ ] Captura del código de estado HTTP vía eventos de red.
 
 ## Fase 2 — Pipeline de Markdown · 🟡 en curso
 - [x] `HtmlCleaner`: eliminar tags no deseados.

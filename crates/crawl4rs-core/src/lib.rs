@@ -16,16 +16,24 @@
 //! # }
 //! ```
 
+#[cfg(feature = "browser")]
+pub mod browser;
 pub mod config;
 pub mod crawler;
 pub mod error;
 pub mod fetch;
 pub mod result;
 
+#[cfg(feature = "browser")]
+pub use browser::{
+    detect_chrome_executable, BrowserFetcher, BrowserPool, BrowserPoolConfig, SessionManager,
+};
 pub use config::{CrawlConfig, DeepStrategy};
 pub use crawler::Crawler;
 pub use error::{Error, Result};
-pub use fetch::{BrowserFetcher, FetchedPage, Fetcher, StaticFetcher};
+#[cfg(not(feature = "browser"))]
+pub use fetch::BrowserFetcher;
+pub use fetch::{FetchedPage, Fetcher, StaticFetcher};
 pub use result::CrawlResult;
 
 #[cfg(test)]
@@ -49,13 +57,14 @@ mod tests {
         assert!(result.markdown.contains("párrafo"));
     }
 
+    #[cfg(not(feature = "browser"))]
     #[tokio::test]
-    async fn browser_fetcher_no_implementado() {
+    async fn browser_fetcher_stub_sin_feature() {
         let crawler = Crawler::new(Arc::new(BrowserFetcher::new()));
         let err = crawler
             .crawl("https://ejemplo.test", &CrawlConfig::default())
             .await
-            .expect_err("el navegador aún no está implementado");
+            .expect_err("sin la feature `browser` no hay backend");
         assert!(matches!(err, Error::NotImplemented(_)));
     }
 }

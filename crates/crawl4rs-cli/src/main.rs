@@ -91,15 +91,27 @@ async fn main() -> Result<()> {
 async fn run_crawl(args: CrawlArgs) -> Result<()> {
     let config = CrawlConfig::default().with_query(args.query.clone());
 
-    let crawler = match &args.html_file {
+    let result = match &args.html_file {
         Some(path) => {
             let html = std::fs::read_to_string(path)?;
-            Crawler::new(Arc::new(StaticFetcher::new(html)))
+            let crawler = Crawler::new(Arc::new(StaticFetcher::new(html)));
+            crawler.crawl(&args.url, &config).await?
         }
-        None => Crawler::new(Arc::new(BrowserFetcher::new())),
+        None => {
+            let fetcher = Arc::new(
+                BrowserFetcher::new()
+                    .with_timeout(std::time::Duration::from_millis(config.timeout_ms)),
+            );
+            let crawler = Crawler::new(fetcher.clone());
+            let result = crawler.crawl(&args.url, &config).await;
+            // Cierre ordenado de Chromium antes de propagar el resultado.
+            drop(crawler);
+            if let Ok(fetcher) = Arc::try_unwrap(fetcher) {
+                fetcher.shutdown().await;
+            }
+            result?
+        }
     };
-
-    let result = crawler.crawl(&args.url, &config).await?;
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&result)?);
