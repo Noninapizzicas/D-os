@@ -1,0 +1,12 @@
+[package]
+name = "crawl4rs-stealth"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Anti-detección de Crawl4RS: rotación de fingerprint y emulación de comportamiento (Fase 5)."
+authors.workspace = true
+
+[dependencies]
+serde = { workspace = true }

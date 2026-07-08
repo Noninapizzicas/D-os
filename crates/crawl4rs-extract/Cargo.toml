@@ -1,0 +1,19 @@
+[package]
+name = "crawl4rs-extract"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Estrategias de extracción estructurada (CSS/XPath, densidad semántica, LLM) para Crawl4RS."
+authors.workspace = true
+
+[dependencies]
+scraper = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }

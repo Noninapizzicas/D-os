@@ -1,0 +1,13 @@
+[package]
+name = "crawl4rs-cache"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Capa de caché de Crawl4RS: LRU en RAM y caché persistente en disco (sled, Fase 4)."
+authors.workspace = true
+
+[dependencies]
+lru = { workspace = true }
+tracing = { workspace = true }
