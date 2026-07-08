@@ -41,8 +41,18 @@ repositorio.
 - [x] `deep` (crawl BFS/DFS): recorrido con `Crawler::crawl_deep`, respeta
       `max_pages`/`max_depth`/estrategia/`same_domain`, resuelve enlaces
       relativos, deduplica y aísla el dominio. Subcomando `crawl4rs deep`.
+- [x] Atributos en `extract_css` (`::attr(src)` / `{selector, attr, many}`):
+      desbloquea imágenes, enlaces, `data-*`.
+- [x] JSON-LD / schema.org (`--jsonld` / `extract_jsonld`): fichas de producto
+      sin adivinar selectores.
+- [x] `map` (enlaces de una página) y `search` (front-end a SearXNG, 503 si no
+      configurado).
+- [x] **PDF digital → Markdown** (feature `pdf`, `pdf-extract`; detección por
+      content-type/`.pdf`). OCR de escaneados = fase aparte (dep grande).
 - [ ] Integrar `readability` (artículo principal).
-- [ ] `LlmExtractionStrategy` con `candle` (ONNX local).
+- [ ] Extracción por LLM: **fuera de Crawl4RS por diseño** (mantiene el binario
+      ligero); el difuso se resuelve por composición markdown+JSON-LD → LLM del
+      consumidor.
 
 ## Fase 4 — Caché y optimización · 🟡 en curso
 - [x] `MemoryCache` (LRU en RAM).

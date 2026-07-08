@@ -84,6 +84,7 @@ mod tests {
                 html: "<article><h1>Cacheable</h1><p>Contenido de prueba con \
                        suficientes palabras para el pipeline.</p></article>"
                     .to_string(),
+                ..Default::default()
             })
         }
     }

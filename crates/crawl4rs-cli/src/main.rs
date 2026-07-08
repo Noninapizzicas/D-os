@@ -16,7 +16,8 @@ use tracing_subscriber::EnvFilter;
 
 use crawl4rs_core::{
     BrowserFetcher, CrawlConfig, Crawler, CssSelectorStrategy, DeepStrategy, ExtractionStrategy,
-    FieldSpec, ResultCache, SemanticDensityStrategy, StaticFetcher, StealthConfig, StealthEngine,
+    FetchMode, FieldSpec, HttpFetcher, ResultCache, SemanticDensityStrategy, StaticFetcher,
+    StealthConfig, StealthEngine,
 };
 
 #[derive(Parser)]
@@ -36,6 +37,20 @@ enum Command {
     Crawl(CrawlArgs),
     /// Crawl profundo siguiendo enlaces (BFS/DFS).
     Deep(DeepArgs),
+    /// Lista los enlaces de una página (mapa ligero, sin contenido).
+    Map {
+        /// URL a mapear.
+        url: String,
+        /// Modo de descarga.
+        #[arg(long, value_enum, default_value_t = Mode::Auto)]
+        mode: Mode,
+        /// Proxy de salida.
+        #[arg(long)]
+        proxy: Option<String>,
+        /// Ignora errores de certificado TLS.
+        #[arg(long)]
+        insecure: bool,
+    },
     /// Lanza el servidor API.
     Serve {
         /// Puerto de escucha.
@@ -62,6 +77,9 @@ struct CrawlArgs {
     /// Procesa un fichero HTML local en lugar de descargar la URL.
     #[arg(long)]
     html_file: Option<String>,
+    /// Modo de descarga: fast (HTTP), browser, o auto (por defecto).
+    #[arg(long, value_enum, default_value_t = Mode::Auto)]
+    mode: Mode,
     /// Imprime `fit_markdown` en lugar del markdown completo.
     #[arg(long)]
     fit: bool,
@@ -86,6 +104,9 @@ struct CrawlArgs {
     /// Extrae el contenido principal por densidad semántica.
     #[arg(long)]
     extract_semantic: bool,
+    /// Extrae los objetos JSON-LD / schema.org de la página.
+    #[arg(long)]
+    jsonld: bool,
 }
 
 #[derive(clap::Args)]
@@ -107,6 +128,9 @@ struct DeepArgs {
     /// Descargas simultáneas.
     #[arg(long, default_value_t = 4)]
     concurrency: usize,
+    /// Modo de descarga: fast (HTTP), browser, o auto (por defecto).
+    #[arg(long, value_enum, default_value_t = Mode::Auto)]
+    mode: Mode,
     /// Seguir también enlaces a otros dominios.
     #[arg(long)]
     cross_domain: bool,
@@ -142,6 +166,26 @@ impl From<Strategy> for DeepStrategy {
     }
 }
 
+#[derive(Clone, Copy, ValueEnum)]
+enum Mode {
+    /// HTTP puro, rápido, sin navegador.
+    Fast,
+    /// Navegador headless + stealth.
+    Browser,
+    /// HTTP y escala a navegador ante 403/challenge (por defecto).
+    Auto,
+}
+
+impl From<Mode> for FetchMode {
+    fn from(m: Mode) -> Self {
+        match m {
+            Mode::Fast => FetchMode::Fast,
+            Mode::Browser => FetchMode::Browser,
+            Mode::Auto => FetchMode::Auto,
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -155,6 +199,12 @@ async fn main() -> Result<()> {
     match cli.command {
         Command::Crawl(args) => run_crawl(args).await,
         Command::Deep(args) => run_deep(args).await,
+        Command::Map {
+            url,
+            mode,
+            proxy,
+            insecure,
+        } => run_map(url, mode, proxy, insecure).await,
         Command::Serve {
             port,
             host,
@@ -184,7 +234,16 @@ fn build_extraction(css: &[String], semantic: bool) -> Result<Option<Arc<dyn Ext
             let (name, selector) = spec
                 .split_once('=')
                 .ok_or_else(|| anyhow::anyhow!("--extract-css espera `nombre=selector`: {spec}"))?;
-            fields.push(FieldSpec::text(name.trim(), selector.trim()));
+            let (name, selector) = (name.trim(), selector.trim());
+            // Sintaxis de atributo: `selector::attr(src)`.
+            if let Some((sel, rest)) = selector.split_once("::attr(") {
+                let attr = rest.strip_suffix(')').ok_or_else(|| {
+                    anyhow::anyhow!("sintaxis inválida, se esperaba `::attr(nombre)`: {selector}")
+                })?;
+                fields.push(FieldSpec::attr(name, sel.trim(), attr.trim()));
+            } else {
+                fields.push(FieldSpec::text(name, selector));
+            }
         }
         Ok(Some(Arc::new(CssSelectorStrategy::new(fields))))
     } else if semantic {
@@ -228,8 +287,20 @@ where
     if insecure {
         fetcher = fetcher.with_insecure(true);
     }
-    let fetcher = Arc::new(fetcher);
-    let mut crawler = Crawler::new(fetcher.clone());
+    let browser = Arc::new(fetcher);
+
+    // Fetcher HTTP rápido (para modos fast/auto). El navegador es perezoso:
+    // en fast/auto-sin-challenge Chromium nunca se lanza.
+    let http = if insecure {
+        HttpFetcher::insecure()
+    } else {
+        HttpFetcher::new()
+    };
+
+    let mut crawler = Crawler::new(browser.clone()).with_browser_fetcher(browser.clone());
+    if let Ok(http) = http {
+        crawler = crawler.with_http_fetcher(Arc::new(http));
+    }
     if let Some(cache) = cache.clone() {
         crawler = crawler.with_cache(cache);
     }
@@ -238,8 +309,8 @@ where
     if let Some(cache) = cache {
         cache.flush();
     }
-    if let Ok(fetcher) = Arc::try_unwrap(fetcher) {
-        fetcher.shutdown().await;
+    if let Ok(browser) = Arc::try_unwrap(browser) {
+        browser.shutdown().await;
     }
     out
 }
@@ -262,7 +333,13 @@ async fn run_serve(host: String, port: u16, stealth: bool) -> Result<()> {
     if stealth {
         fetcher = fetcher.with_stealth(Arc::new(StealthEngine::new(StealthConfig::default())));
     }
-    let crawler = Crawler::new(Arc::new(fetcher));
+    let browser = Arc::new(fetcher);
+    // El servidor sirve todos los modos: HTTP rápido + navegador. `mode` de
+    // cada `POST /crawl` decide cuál se usa (auto por defecto).
+    let mut crawler = Crawler::new(browser.clone()).with_browser_fetcher(browser);
+    if let Ok(http) = HttpFetcher::new() {
+        crawler = crawler.with_http_fetcher(Arc::new(http));
+    }
 
     let addr: SocketAddr = format!("{host}:{port}")
         .parse()
@@ -272,8 +349,32 @@ async fn run_serve(host: String, port: u16, stealth: bool) -> Result<()> {
     Ok(())
 }
 
+async fn run_map(url: String, mode: Mode, proxy: Option<String>, insecure: bool) -> Result<()> {
+    let config = CrawlConfig {
+        mode: mode.into(),
+        ..Default::default()
+    };
+    let u = url.clone();
+    let links = with_browser(
+        config.timeout_ms,
+        None,
+        false,
+        proxy,
+        insecure,
+        None,
+        |crawler| async move { Ok(crawler.map(&u, &config).await?) },
+    )
+    .await?;
+    println!("{}", serde_json::to_string_pretty(&links)?);
+    Ok(())
+}
+
 async fn run_crawl(args: CrawlArgs) -> Result<()> {
-    let config = CrawlConfig::default().with_query(args.query.clone());
+    let config = CrawlConfig {
+        mode: args.mode.into(),
+        extract_jsonld: args.jsonld,
+        ..CrawlConfig::default().with_query(args.query.clone())
+    };
 
     let extraction = build_extraction(&args.extract_css, args.extract_semantic)?;
 
@@ -319,6 +420,7 @@ async fn run_deep(args: DeepArgs) -> Result<()> {
         same_domain: !args.cross_domain,
         concurrency: args.concurrency,
         stealth: args.stealth,
+        mode: args.mode.into(),
         ..Default::default()
     };
 

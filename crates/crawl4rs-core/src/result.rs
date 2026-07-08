@@ -26,6 +26,10 @@ pub struct CrawlResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extracted: Option<Value>,
 
+    /// Objetos JSON-LD / schema.org de la página, si se pidió `extract_jsonld`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub jsonld: Vec<Value>,
+
     /// Enlaces encontrados en la página, útiles para crawl profundo.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub links: Vec<String>,

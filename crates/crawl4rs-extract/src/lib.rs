@@ -15,9 +15,11 @@ use serde_json::Value;
 use thiserror::Error;
 
 mod css;
+mod jsonld;
 mod semantic;
 
 pub use css::{CssSelectorStrategy, FieldSpec};
+pub use jsonld::extract_jsonld;
 pub use semantic::SemanticDensityStrategy;
 
 /// Errores de extracción.

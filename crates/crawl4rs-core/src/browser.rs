@@ -254,6 +254,7 @@ impl BrowserPool {
             url: final_url,
             status: None,
             html,
+            ..Default::default()
         })
     }
 

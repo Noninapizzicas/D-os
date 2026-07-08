@@ -21,6 +21,7 @@ mod dashboard;
 mod dto;
 mod jobs;
 mod routes;
+mod search;
 mod state;
 
 use std::net::SocketAddr;
@@ -29,15 +30,17 @@ use crawl4rs_core::Crawler;
 
 pub use auth::AuthConfig;
 pub use dto::{
-    CrawlAccepted, CrawlRequest, JobResult, JobState, JobStatus, PageOut, TokenResponse,
+    CrawlAccepted, CrawlRequest, JobResult, JobState, JobStatus, MapRequest, MapResponse, PageOut,
+    SearchRequest, SearchResult, TokenResponse,
 };
 pub use routes::router;
 pub use state::AppState;
 
 /// Arranca el servidor en `addr` con el crawler y la configuración de auth
-/// dados. Bloquea hasta que el servidor termina.
+/// dados. Lee `SEARXNG_URL` del entorno para habilitar `POST /search`.
+/// Bloquea hasta que el servidor termina.
 pub async fn serve(addr: SocketAddr, crawler: Crawler, auth: AuthConfig) -> std::io::Result<()> {
-    let state = AppState::new(crawler, auth);
+    let state = AppState::new(crawler, auth).with_searxng(std::env::var("SEARXNG_URL").ok());
     let app = router(state);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!(%addr, "servidor Crawl4RS escuchando");
@@ -56,7 +59,8 @@ mod tests {
 
     fn test_app() -> axum::Router {
         let html = "<html><body><article><h1>Servido</h1><p>Contenido de prueba \
-                    con palabras suficientes para el pipeline.</p></article></body></html>";
+                    con palabras suficientes para el pipeline.</p>\
+                    <a href=\"/otra\">otra página</a></article></body></html>";
         let crawler = Crawler::new(Arc::new(StaticFetcher::new(html)));
         let state = AppState::new(crawler, AuthConfig::new("secreto-de-test"));
         router(state)
@@ -218,5 +222,63 @@ mod tests {
         }
 
         assert_eq!(result["pages"][0]["extracted"]["titulo"], "Servido");
+    }
+
+    async fn token(app: &axum::Router) -> String {
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/auth/token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        body_json(resp).await["token"].as_str().unwrap().to_string()
+    }
+
+    #[tokio::test]
+    async fn map_devuelve_enlaces_resueltos() {
+        let app = test_app();
+        let tok = token(&app).await;
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/map")
+                    .header("authorization", format!("Bearer {tok}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"url":"https://x.test/p"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_json(resp).await;
+        let links = body["links"].as_array().unwrap();
+        assert!(links.iter().any(|l| l == "https://x.test/otra"));
+    }
+
+    #[tokio::test]
+    async fn search_sin_searxng_degrada_503() {
+        let app = test_app(); // AppState sin SearXNG configurado.
+        let tok = token(&app).await;
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/search")
+                    .header("authorization", format!("Bearer {tok}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"query":"teclados"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 }

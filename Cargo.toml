@@ -56,6 +56,12 @@ clap = { version = "4", features = ["derive"] }
 # Caché persistente en disco
 sled = "0.34"
 
+# Cliente HTTP (fetch rápido sin navegador)
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip", "brotli"] }
+
+# Extracción de texto de PDF digital (sin dep nativa; OCR fuera)
+pdf-extract = "0.12"
+
 # Servidor HTTP / API
 axum = { version = "0.8", features = ["ws"] }
 tower = "0.5"

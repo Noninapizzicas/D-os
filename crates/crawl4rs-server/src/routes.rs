@@ -12,8 +12,12 @@ use std::sync::Arc;
 use crawl4rs_core::{CrawlConfig, CssSelectorStrategy, FieldSpec, SemanticDensityStrategy};
 
 use crate::auth::require_jwt;
-use crate::dto::{CrawlAccepted, CrawlRequest, JobResult, PageOut, TokenResponse};
+use crate::dto::{
+    CrawlAccepted, CrawlRequest, JobResult, MapRequest, MapResponse, PageOut, SearchRequest,
+    TokenResponse,
+};
 use crate::jobs::{Job, StreamEvent};
+use crate::search::{self, SearchError};
 use crate::state::AppState;
 
 /// Construye el router de la aplicación.
@@ -22,6 +26,8 @@ pub fn router(state: AppState) -> Router {
         .route("/crawl", post(create_crawl))
         .route("/crawl/{id}/status", get(get_status))
         .route("/crawl/{id}/result", get(get_result))
+        .route("/map", post(post_map))
+        .route("/search", post(post_search))
         .layer(middleware::from_fn_with_state(state.clone(), require_jwt));
 
     Router::new()
@@ -71,10 +77,12 @@ async fn create_crawl(
 
     let config = CrawlConfig {
         query: req.query.clone(),
+        mode: req.mode,
         max_depth: req.max_depth,
         max_pages: req.max_pages.max(1),
         concurrency: req.concurrency.max(1),
         same_domain: !req.cross_domain,
+        extract_jsonld: req.extract_jsonld,
         ..Default::default()
     };
 
@@ -85,7 +93,7 @@ async fn create_crawl(
         let fields = req
             .extract_css
             .iter()
-            .map(|(name, sel)| FieldSpec::text(name.clone(), sel.clone()))
+            .map(|(name, spec)| field_spec(name, spec))
             .collect();
         crawler = crawler.with_extraction(std::sync::Arc::new(CssSelectorStrategy::new(fields)));
     } else if req.extract_semantic {
@@ -99,6 +107,67 @@ async fn create_crawl(
     });
 
     Ok((StatusCode::ACCEPTED, Json(CrawlAccepted { id })))
+}
+
+/// `POST /map` — enlaces de una página (ligero, sin markdown de contenido).
+async fn post_map(
+    State(state): State<AppState>,
+    Json(req): Json<MapRequest>,
+) -> Result<Json<MapResponse>, StatusCode> {
+    if req.url.trim().is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let config = CrawlConfig {
+        mode: req.mode,
+        ..Default::default()
+    };
+    match state.crawler.map(&req.url, &config).await {
+        Ok(links) => Ok(Json(MapResponse {
+            url: req.url,
+            links,
+        })),
+        Err(_) => Err(StatusCode::BAD_GATEWAY),
+    }
+}
+
+/// `POST /search` — búsqueda web vía SearXNG (503 si no configurado).
+async fn post_search(State(state): State<AppState>, Json(req): Json<SearchRequest>) -> Response {
+    if req.query.trim().is_empty() {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    match search::search(state.searxng_url.as_deref(), &req.query, req.limit).await {
+        Ok(results) => Json(results).into_response(),
+        Err(SearchError::NotConfigured) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "search no disponible: define SEARXNG_URL",
+        )
+            .into_response(),
+        Err(SearchError::Upstream(msg)) => {
+            (StatusCode::BAD_GATEWAY, format!("SearXNG: {msg}")).into_response()
+        }
+    }
+}
+
+/// Traduce un [`FieldSpecDto`] del DTO a un [`FieldSpec`] del core.
+fn field_spec(name: &str, spec: &crate::dto::FieldSpecDto) -> FieldSpec {
+    use crate::dto::FieldSpecDto;
+    match spec {
+        FieldSpecDto::Text(selector) => FieldSpec::text(name, selector),
+        FieldSpecDto::Detailed {
+            selector,
+            attr,
+            many,
+        } => {
+            let mut f = match attr {
+                Some(a) => FieldSpec::attr(name, selector, a),
+                None => FieldSpec::text(name, selector),
+            };
+            if *many {
+                f = f.all();
+            }
+            f
+        }
+    }
 }
 
 /// Ejecuta el crawl de un trabajo, emitiendo progreso.
@@ -129,6 +198,7 @@ async fn run_job(crawler: crawl4rs_core::Crawler, url: String, config: CrawlConf
                     url: p.url,
                     fit_markdown: p.fit_markdown,
                     extracted: p.extracted,
+                    jsonld: p.jsonld,
                 })
                 .collect();
             let errors = report

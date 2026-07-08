@@ -36,7 +36,13 @@ funciona hoy, compilando y con tests en verde:
   JWT y dashboard web embebido.
 - 🖥️ **CLI** `crawl4rs` con los subcomandos `crawl`, `deep`, `serve`, `config`.
 
-Queda pendiente la extracción con LLM local (`candle`) y la documentación
+Además: **fetch rápido sin navegador** (`--mode fast`/`auto`), **JSON-LD /
+schema.org**, **`map`** (enlaces), **`search`** (SearXNG) y **PDF digital →
+Markdown**.
+
+Por diseño, **Crawl4RS no incorpora un LLM** (ni `candle`/ONNX): eso rompería
+lo ligero y duplicaría el LLM del consumidor (p. ej. Enki). Ver
+[«Extracción de datos»](#extracción-de-datos). Queda pendiente la documentación
 completa (mdBook).
 
 ## Instalación y uso
@@ -45,8 +51,11 @@ completa (mdBook).
 # Compilar
 cargo build --release
 
-# Crawl real: lanza Chromium headless, navega y convierte a Markdown
+# Crawl real (modo auto por defecto): intenta HTTP puro y sólo escala a
+# navegador ante 403/challenge — sin abrir Chromium para páginas simples.
 crawl4rs crawl https://ejemplo.com
+crawl4rs crawl https://ejemplo.com --mode fast      # HTTP puro, sin navegador
+crawl4rs crawl https://ejemplo.com --mode browser   # fuerza el navegador
 
 # Sólo el "fit_markdown", filtrado por relevancia a una consulta
 crawl4rs crawl https://ejemplo.com --fit --query "rust async runtime"
@@ -61,9 +70,19 @@ crawl4rs deep https://ejemplo.com --cache ./.crawl4rs-cache --concurrency 8
 # Modo stealth: fingerprint rotado + comportamiento humano frente a WAFs
 crawl4rs crawl https://ejemplo.com --stealth
 
-# Extracción estructurada por CSS (o por densidad semántica con --extract-semantic)
+# Extracción estructurada por CSS: texto, o atributos con `::attr(...)`
 crawl4rs crawl https://tienda.com --json \
-    --extract-css "titulo=h1" --extract-css "precio=.price"
+    --extract-css "titulo=h1" --extract-css "precio=.price" \
+    --extract-css "imagen=img::attr(src)" --extract-css "enlace=a::attr(href)"
+
+# JSON-LD / schema.org (fichas de producto sin adivinar selectores)
+crawl4rs crawl https://tienda.com/producto --json --jsonld
+
+# Mapa de enlaces de una página (ligero, sin contenido)
+crawl4rs map https://ejemplo.com
+
+# PDF digital → Markdown (detección automática por content-type/.pdf, modo fast)
+crawl4rs crawl https://ejemplo.com/factura.pdf --mode fast
 
 # A través de un proxy de salida (añade --insecure si intercepta TLS)
 crawl4rs crawl https://ejemplo.com --proxy 127.0.0.1:8888 --insecure
@@ -100,8 +119,12 @@ curl -s localhost:8080/crawl/$ID/result -H "Authorization: Bearer $TOKEN"
 ```
 
 Endpoints: `POST /auth/token`, `POST /crawl`, `GET /crawl/{id}/status`,
-`GET /crawl/{id}/result`, `GET /crawl/{id}/stream` (WebSocket), `GET /dashboard`,
-`GET /health`.
+`GET /crawl/{id}/result`, `GET /crawl/{id}/stream` (WebSocket), `POST /map`
+(enlaces de una página), `POST /search` (búsqueda web vía SearXNG; requiere
+`SEARXNG_URL`, si no degrada con 503), `GET /dashboard`, `GET /health`.
+
+`POST /crawl` acepta además `mode` (`fast`/`browser`/`auto`), `extract_css`
+(texto o `{selector, attr, many}`) y `extract_jsonld`.
 
 ### Docker
 
@@ -120,6 +143,30 @@ docker build --target minimal -t crawl4rs:minimal .
 
 Cada tag `vX.Y.Z` publica binarios para Linux y macOS (x86-64 y arm64) vía
 GitHub Actions (`.github/workflows/release.yml`).
+
+### Extracción de datos
+
+Hay **dos vías**, según el tipo de esquema — y Crawl4RS **no usa LLM** en
+ninguna:
+
+1. **Determinista / repetible** (campos conocidos, alto volumen: precio,
+   cantidad, sku…). Se resuelve con `extract_css` + atributos, que es barato,
+   fiable y reproducible cada día:
+   ```bash
+   crawl4rs crawl https://tienda.com/p --json \
+       --extract-css "precio=.price::attr(content)" \
+       --extract-css "sku=[itemprop=sku]::attr(content)"
+   ```
+   Y **JSON-LD** (`--jsonld`) da la ficha `Product` estructurada sin selectores.
+
+2. **Arbitrario / difuso** («saca lo que haya», en lenguaje natural). Se
+   resuelve por **composición**: Crawl4RS devuelve `markdown` limpio +
+   `jsonld`, y **el LLM del consumidor** (p. ej. el `ai-gateway` de Enki)
+   aplica el esquema. Así el crawler queda ligero y desacoplado, y el LLM vive
+   donde ya existe.
+
+Un endpoint `POST /extract` sería sólo un alias ergonómico de la vía 1
+(CSS/atributos); no se incluye por defecto para no duplicar superficie.
 
 ### Como biblioteca
 
