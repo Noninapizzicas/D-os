@@ -1,0 +1,12 @@
+/target
+**/*.rs.bk
+*.pdb
+Cargo.lock.orig
+
+# Caché persistente de crawl4rs (sled / disco)
+/.crawl4rs-cache/
+*.sled
+
+# Artefactos de entorno
+.env
+.DS_Store

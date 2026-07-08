@@ -1,0 +1,15 @@
+[package]
+name = "crawl4rs-markdown"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Pipeline de Crawl4RS: HTML → Markdown limpio → fit_markdown, con filtros de contenido (poda, BM25)."
+authors.workspace = true
+
+[dependencies]
+scraper = { workspace = true }
+ego-tree = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
