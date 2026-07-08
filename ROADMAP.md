@@ -34,6 +34,10 @@ repositorio.
 ## Fase 3 — Extracción estructurada y crawl profundo · 🟡 en curso
 - [x] `CssSelectorStrategy`.
 - [x] `SemanticDensityStrategy`.
+- [x] Extracción **integrada en el crawler** (`Crawler::with_extraction`):
+      puebla `CrawlResult::extracted`. Expuesta en la CLI (`--extract-css
+      nombre=sel`, `--extract-semantic`) y en la API (`extract_css`,
+      `extract_semantic` en `POST /crawl`; `extracted` por página).
 - [x] `deep` (crawl BFS/DFS): recorrido con `Crawler::crawl_deep`, respeta
       `max_pages`/`max_depth`/estrategia/`same_domain`, resuelve enlaces
       relativos, deduplica y aísla el dominio. Subcomando `crawl4rs deep`.
@@ -65,8 +69,10 @@ repositorio.
 - [x] Aplicación vía CDP en `BrowserPool`: UA/idioma/viewport por página,
       `addScriptToEvaluateOnNewDocument` antes de navegar, movimiento de ratón
       y pausas. Flag `--stealth` en la CLI.
+- [x] Soporte de **proxy** de salida (`--proxy` / `BrowserPoolConfig.proxy`,
+      pasado como `--proxy-server`). La rotación por petición requiere
+      contextos de navegador separados (pendiente).
 - [ ] CDP endurecido a la manera de `chaser-oxide` (patch de más señales CDP).
-- [ ] Proxies rotativos.
 
 ## Fase 6 — API, CLI y dashboard · 🟡 en curso
 - [x] CLI con `clap` (`crawl`, `deep`, `serve`, `config`).

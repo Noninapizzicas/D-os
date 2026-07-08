@@ -59,6 +59,10 @@ pub struct BrowserPoolConfig {
     /// Motor stealth. Si está presente, cada descarga aplica un fingerprint
     /// rotado, inyecta el script de ocultación y añade retardos "humanos".
     pub stealth: Option<Arc<StealthEngine>>,
+    /// Proxy de salida (`host:puerto` o `esquema://host:puerto`), pasado a
+    /// Chromium como `--proxy-server`. La rotación por petición requiere
+    /// contextos de navegador separados (pendiente).
+    pub proxy: Option<String>,
 }
 
 impl Default for BrowserPoolConfig {
@@ -71,6 +75,7 @@ impl Default for BrowserPoolConfig {
             window: (1280, 800),
             user_data_dir: None,
             stealth: None,
+            proxy: None,
         }
     }
 }
@@ -124,6 +129,9 @@ impl BrowserPool {
         }
         if config.no_sandbox {
             builder = builder.no_sandbox();
+        }
+        if let Some(proxy) = &config.proxy {
+            builder = builder.arg(format!("--proxy-server={proxy}"));
         }
         let executable = config.executable.clone().or_else(detect_chrome_executable);
         if let Some(exe) = &executable {
@@ -350,6 +358,12 @@ impl BrowserFetcher {
     /// Activa el modo stealth con el motor indicado.
     pub fn with_stealth(mut self, engine: Arc<StealthEngine>) -> Self {
         self.config.stealth = Some(engine);
+        self
+    }
+
+    /// Enruta el tráfico a través del proxy indicado (`--proxy-server`).
+    pub fn with_proxy(mut self, proxy: impl Into<String>) -> Self {
+        self.config.proxy = Some(proxy.into());
         self
     }
 

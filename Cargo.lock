@@ -407,6 +407,7 @@ dependencies = [
  "async-trait",
  "chromiumoxide",
  "crawl4rs-cache",
+ "crawl4rs-extract",
  "crawl4rs-markdown",
  "crawl4rs-stealth",
  "futures",

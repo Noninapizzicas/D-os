@@ -15,8 +15,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 use tracing_subscriber::EnvFilter;
 
 use crawl4rs_core::{
-    BrowserFetcher, CrawlConfig, Crawler, DeepStrategy, ResultCache, StaticFetcher, StealthConfig,
-    StealthEngine,
+    BrowserFetcher, CrawlConfig, Crawler, CssSelectorStrategy, DeepStrategy, ExtractionStrategy,
+    FieldSpec, ResultCache, SemanticDensityStrategy, StaticFetcher, StealthConfig, StealthEngine,
 };
 
 #[derive(Parser)]
@@ -74,6 +74,15 @@ struct CrawlArgs {
     /// Activa el modo stealth (rotación de fingerprint + comportamiento humano).
     #[arg(long)]
     stealth: bool,
+    /// Proxy de salida (`host:puerto` o `esquema://host:puerto`).
+    #[arg(long)]
+    proxy: Option<String>,
+    /// Extrae un campo por CSS: `nombre=selector` (repetible).
+    #[arg(long = "extract-css", value_name = "NOMBRE=SEL")]
+    extract_css: Vec<String>,
+    /// Extrae el contenido principal por densidad semántica.
+    #[arg(long)]
+    extract_semantic: bool,
 }
 
 #[derive(clap::Args)]
@@ -104,6 +113,9 @@ struct DeepArgs {
     /// Activa el modo stealth (rotación de fingerprint + comportamiento humano).
     #[arg(long)]
     stealth: bool,
+    /// Proxy de salida (`host:puerto` o `esquema://host:puerto`).
+    #[arg(long)]
+    proxy: Option<String>,
     /// Imprime el informe completo como JSON.
     #[arg(long)]
     json: bool,
@@ -158,12 +170,40 @@ fn open_cache(dir: &Option<String>) -> Result<Option<ResultCache>> {
     }
 }
 
+/// Construye una estrategia de extracción a partir de las opciones de la CLI.
+fn build_extraction(css: &[String], semantic: bool) -> Result<Option<Arc<dyn ExtractionStrategy>>> {
+    if !css.is_empty() {
+        let mut fields = Vec::with_capacity(css.len());
+        for spec in css {
+            let (name, selector) = spec
+                .split_once('=')
+                .ok_or_else(|| anyhow::anyhow!("--extract-css espera `nombre=selector`: {spec}"))?;
+            fields.push(FieldSpec::text(name.trim(), selector.trim()));
+        }
+        Ok(Some(Arc::new(CssSelectorStrategy::new(fields))))
+    } else if semantic {
+        Ok(Some(Arc::new(SemanticDensityStrategy::new())))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Aplica una estrategia de extracción a un crawler, si la hay.
+fn apply_extraction(crawler: Crawler, extraction: Option<Arc<dyn ExtractionStrategy>>) -> Crawler {
+    match extraction {
+        Some(strategy) => crawler.with_extraction(strategy),
+        None => crawler,
+    }
+}
+
 /// Ejecuta `f` con un crawler de navegador (caché y stealth opcionales),
 /// cerrando Chromium de forma ordenada al terminar (aunque `f` devuelva error).
 async fn with_browser<F, Fut, T>(
     timeout_ms: u64,
     cache: Option<ResultCache>,
     stealth: bool,
+    proxy: Option<String>,
+    extraction: Option<Arc<dyn ExtractionStrategy>>,
     f: F,
 ) -> Result<T>
 where
@@ -174,11 +214,15 @@ where
     if stealth {
         fetcher = fetcher.with_stealth(Arc::new(StealthEngine::new(StealthConfig::default())));
     }
+    if let Some(proxy) = proxy {
+        fetcher = fetcher.with_proxy(proxy);
+    }
     let fetcher = Arc::new(fetcher);
     let mut crawler = Crawler::new(fetcher.clone());
     if let Some(cache) = cache.clone() {
         crawler = crawler.with_cache(cache);
     }
+    crawler = apply_extraction(crawler, extraction);
     let out = f(crawler).await;
     if let Some(cache) = cache {
         cache.flush();
@@ -220,10 +264,13 @@ async fn run_serve(host: String, port: u16, stealth: bool) -> Result<()> {
 async fn run_crawl(args: CrawlArgs) -> Result<()> {
     let config = CrawlConfig::default().with_query(args.query.clone());
 
+    let extraction = build_extraction(&args.extract_css, args.extract_semantic)?;
+
     let result = match &args.html_file {
         Some(path) => {
             let html = std::fs::read_to_string(path)?;
-            let crawler = Crawler::new(Arc::new(StaticFetcher::new(html)));
+            let crawler =
+                apply_extraction(Crawler::new(Arc::new(StaticFetcher::new(html))), extraction);
             crawler.crawl(&args.url, &config).await?
         }
         None => {
@@ -233,6 +280,8 @@ async fn run_crawl(args: CrawlArgs) -> Result<()> {
                 config.timeout_ms,
                 cache,
                 args.stealth,
+                args.proxy.clone(),
+                extraction,
                 |crawler| async move { Ok(crawler.crawl(&url, &config).await?) },
             )
             .await?
@@ -267,6 +316,8 @@ async fn run_deep(args: DeepArgs) -> Result<()> {
         config.timeout_ms,
         cache,
         args.stealth,
+        args.proxy.clone(),
+        None,
         |crawler| async move { Ok(crawler.crawl_deep(&url, &config).await?) },
     )
     .await?;

@@ -23,6 +23,13 @@ pub struct CrawlRequest {
     /// Seguir enlaces a otros dominios.
     #[serde(default)]
     pub cross_domain: bool,
+    /// Extracción por CSS: mapa `nombre → selector`. Si está presente, cada
+    /// página incluye los campos extraídos en `extracted`.
+    #[serde(default)]
+    pub extract_css: std::collections::HashMap<String, String>,
+    /// Extrae el contenido principal por densidad semántica.
+    #[serde(default)]
+    pub extract_semantic: bool,
 }
 
 fn default_max_pages() -> usize {
@@ -83,6 +90,9 @@ pub struct PageOut {
     pub url: String,
     /// Markdown filtrado, listo para LLM.
     pub fit_markdown: String,
+    /// Datos estructurados extraídos, si se pidió extracción.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extracted: Option<Value>,
 }
 
 /// Respuesta de `GET /crawl/{id}/result`.

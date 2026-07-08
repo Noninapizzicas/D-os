@@ -161,4 +161,62 @@ mod tests {
             .unwrap()
             .contains("Servido"));
     }
+
+    #[tokio::test]
+    async fn crawl_con_extraccion_css() {
+        let app = test_app();
+        let token = {
+            let resp = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/auth/token")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            body_json(resp).await["token"].as_str().unwrap().to_string()
+        };
+
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/crawl")
+                    .header("authorization", format!("Bearer {token}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"url":"https://x.test/a","max_depth":0,"extract_css":{"titulo":"h1"}}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let id = body_json(resp).await["id"].as_str().unwrap().to_string();
+
+        let mut result = serde_json::Value::Null;
+        for _ in 0..50 {
+            let resp = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri(format!("/crawl/{id}/result"))
+                        .header("authorization", format!("Bearer {token}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            if resp.status() == StatusCode::OK {
+                result = body_json(resp).await;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+
+        assert_eq!(result["pages"][0]["extracted"]["titulo"], "Servido");
+    }
 }
