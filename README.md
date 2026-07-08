@@ -65,8 +65,8 @@ crawl4rs crawl https://ejemplo.com --stealth
 crawl4rs crawl https://tienda.com --json \
     --extract-css "titulo=h1" --extract-css "precio=.price"
 
-# A través de un proxy de salida
-crawl4rs crawl https://ejemplo.com --proxy 127.0.0.1:8888
+# A través de un proxy de salida (añade --insecure si intercepta TLS)
+crawl4rs crawl https://ejemplo.com --proxy 127.0.0.1:8888 --insecure
 
 # Procesar un HTML local sin lanzar navegador
 crawl4rs crawl https://ejemplo.com --html-file pagina.html

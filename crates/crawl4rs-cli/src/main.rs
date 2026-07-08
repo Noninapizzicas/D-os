@@ -77,6 +77,9 @@ struct CrawlArgs {
     /// Proxy de salida (`host:puerto` o `esquema://host:puerto`).
     #[arg(long)]
     proxy: Option<String>,
+    /// Ignora errores de certificado TLS (inseguro; proxies interceptores).
+    #[arg(long)]
+    insecure: bool,
     /// Extrae un campo por CSS: `nombre=selector` (repetible).
     #[arg(long = "extract-css", value_name = "NOMBRE=SEL")]
     extract_css: Vec<String>,
@@ -116,6 +119,9 @@ struct DeepArgs {
     /// Proxy de salida (`host:puerto` o `esquema://host:puerto`).
     #[arg(long)]
     proxy: Option<String>,
+    /// Ignora errores de certificado TLS (inseguro; proxies interceptores).
+    #[arg(long)]
+    insecure: bool,
     /// Imprime el informe completo como JSON.
     #[arg(long)]
     json: bool,
@@ -198,11 +204,13 @@ fn apply_extraction(crawler: Crawler, extraction: Option<Arc<dyn ExtractionStrat
 
 /// Ejecuta `f` con un crawler de navegador (caché y stealth opcionales),
 /// cerrando Chromium de forma ordenada al terminar (aunque `f` devuelva error).
+#[allow(clippy::too_many_arguments)]
 async fn with_browser<F, Fut, T>(
     timeout_ms: u64,
     cache: Option<ResultCache>,
     stealth: bool,
     proxy: Option<String>,
+    insecure: bool,
     extraction: Option<Arc<dyn ExtractionStrategy>>,
     f: F,
 ) -> Result<T>
@@ -216,6 +224,9 @@ where
     }
     if let Some(proxy) = proxy {
         fetcher = fetcher.with_proxy(proxy);
+    }
+    if insecure {
+        fetcher = fetcher.with_insecure(true);
     }
     let fetcher = Arc::new(fetcher);
     let mut crawler = Crawler::new(fetcher.clone());
@@ -281,6 +292,7 @@ async fn run_crawl(args: CrawlArgs) -> Result<()> {
                 cache,
                 args.stealth,
                 args.proxy.clone(),
+                args.insecure,
                 extraction,
                 |crawler| async move { Ok(crawler.crawl(&url, &config).await?) },
             )
@@ -317,6 +329,7 @@ async fn run_deep(args: DeepArgs) -> Result<()> {
         cache,
         args.stealth,
         args.proxy.clone(),
+        args.insecure,
         None,
         |crawler| async move { Ok(crawler.crawl_deep(&url, &config).await?) },
     )

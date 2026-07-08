@@ -63,6 +63,10 @@ pub struct BrowserPoolConfig {
     /// Chromium como `--proxy-server`. La rotación por petición requiere
     /// contextos de navegador separados (pendiente).
     pub proxy: Option<String>,
+    /// Ignorar errores de certificado TLS (`--ignore-certificate-errors`).
+    /// Útil para crawlear tras un proxy interceptor o contra staging con
+    /// certificados self-signed. Inseguro: desactivado por defecto.
+    pub ignore_cert_errors: bool,
 }
 
 impl Default for BrowserPoolConfig {
@@ -76,6 +80,7 @@ impl Default for BrowserPoolConfig {
             user_data_dir: None,
             stealth: None,
             proxy: None,
+            ignore_cert_errors: false,
         }
     }
 }
@@ -132,6 +137,9 @@ impl BrowserPool {
         }
         if let Some(proxy) = &config.proxy {
             builder = builder.arg(format!("--proxy-server={proxy}"));
+        }
+        if config.ignore_cert_errors {
+            builder = builder.arg("--ignore-certificate-errors");
         }
         let executable = config.executable.clone().or_else(detect_chrome_executable);
         if let Some(exe) = &executable {
@@ -364,6 +372,13 @@ impl BrowserFetcher {
     /// Enruta el tráfico a través del proxy indicado (`--proxy-server`).
     pub fn with_proxy(mut self, proxy: impl Into<String>) -> Self {
         self.config.proxy = Some(proxy.into());
+        self
+    }
+
+    /// Ignora errores de certificado TLS (inseguro; para proxies interceptores
+    /// o staging con certificados self-signed).
+    pub fn with_insecure(mut self, insecure: bool) -> Self {
+        self.config.ignore_cert_errors = insecure;
         self
     }
 
