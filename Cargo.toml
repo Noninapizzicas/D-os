@@ -31,6 +31,10 @@ crawl4rs-server = { path = "crates/crawl4rs-server", version = "0.0.1" }
 # Runtime asíncrono
 tokio = { version = "1", default-features = false }
 async-trait = "0.1"
+futures = "0.3"
+
+# Control de navegador (CDP)
+chromiumoxide = "0.9"
 
 # Serialización y errores
 serde = { version = "1", features = ["derive"] }
