@@ -35,6 +35,10 @@ pub use browser::{
 #[cfg(feature = "cache")]
 pub use cache::ResultCache;
 pub use config::{CrawlConfig, DeepStrategy};
+#[cfg(feature = "extract")]
+pub use crawl4rs_extract::{
+    CssSelectorStrategy, ExtractionStrategy, FieldSpec, SemanticDensityStrategy,
+};
 pub use crawler::Crawler;
 pub use deep::{DeepProgress, DeepReport};
 pub use error::{Error, Result};
@@ -62,6 +66,30 @@ mod tests {
         assert!(result.is_success());
         assert!(result.markdown.contains("Título"));
         assert!(result.markdown.contains("párrafo"));
+    }
+
+    #[cfg(feature = "extract")]
+    #[tokio::test]
+    async fn extraccion_css_puebla_extracted() {
+        use crate::{CssSelectorStrategy, FieldSpec};
+        let html = r#"<html><body><article><h1 class="t">Producto X</h1>
+            <span class="price">9.99</span>
+            <p>Descripción con palabras suficientes para el pipeline.</p>
+            </article></body></html>"#;
+        let strat = CssSelectorStrategy::new(vec![
+            FieldSpec::text("titulo", ".t"),
+            FieldSpec::text("precio", ".price"),
+        ]);
+        let crawler =
+            Crawler::new(Arc::new(StaticFetcher::new(html))).with_extraction(Arc::new(strat));
+        let result = crawler
+            .crawl("https://tienda.test/x", &CrawlConfig::default())
+            .await
+            .unwrap();
+
+        let extracted = result.extracted.expect("debe haber datos extraídos");
+        assert_eq!(extracted["titulo"], "Producto X");
+        assert_eq!(extracted["precio"], "9.99");
     }
 
     #[cfg(not(feature = "browser"))]

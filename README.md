@@ -24,7 +24,8 @@ funciona hoy, compilando y con tests en verde:
 - 🔎 **Filtros de contenido**: poda heurística por densidad de texto y
   **BM25** (Okapi, implementado desde cero) para filtrar por relevancia a una
   consulta.
-- 🧩 **Estrategias de extracción**: selectores CSS y densidad semántica.
+- 🧩 **Extracción estructurada** integrada en el crawler: selectores CSS y
+  densidad semántica, disponibles en la librería, la CLI y la API.
 - 🗃️ **Caché de dos niveles**: LRU en RAM + `sled` en disco (`TieredCache`),
   integrada en el crawler para no reprocesar páginas ya vistas.
 - ⚡ **Concurrencia acotada** en `crawl_many` y crawl profundo.
@@ -59,6 +60,13 @@ crawl4rs deep https://ejemplo.com --cache ./.crawl4rs-cache --concurrency 8
 
 # Modo stealth: fingerprint rotado + comportamiento humano frente a WAFs
 crawl4rs crawl https://ejemplo.com --stealth
+
+# Extracción estructurada por CSS (o por densidad semántica con --extract-semantic)
+crawl4rs crawl https://tienda.com --json \
+    --extract-css "titulo=h1" --extract-css "precio=.price"
+
+# A través de un proxy de salida (añade --insecure si intercepta TLS)
+crawl4rs crawl https://ejemplo.com --proxy 127.0.0.1:8888 --insecure
 
 # Procesar un HTML local sin lanzar navegador
 crawl4rs crawl https://ejemplo.com --html-file pagina.html
@@ -98,12 +106,20 @@ Endpoints: `POST /auth/token`, `POST /crawl`, `GET /crawl/{id}/status`,
 ### Docker
 
 ```bash
+# Imagen por defecto: Debian slim + Chromium — el modo navegador funciona
+# de fábrica (`crawl`, `deep`, `serve`).
 docker build -t crawl4rs .
 docker run -p 8080:8080 -e CRAWL4RS_JWT_SECRET=… crawl4rs
+
+# Imagen mínima (distroless, sin navegador) para procesar HTML ya obtenido
+# o servir la API sin `crawl <url>`:
+docker build --target minimal -t crawl4rs:minimal .
 ```
 
-La imagen (`distroless/cc`) empaqueta sólo el binario; para el modo navegador
-aporta un Chromium accesible y apunta `CRAWL4RS_CHROME` a él.
+### Binarios precompilados
+
+Cada tag `vX.Y.Z` publica binarios para Linux y macOS (x86-64 y arm64) vía
+GitHub Actions (`.github/workflows/release.yml`).
 
 ### Como biblioteca
 

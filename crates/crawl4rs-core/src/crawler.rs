@@ -22,6 +22,8 @@ pub struct Crawler {
     pipeline: MarkdownPipeline,
     #[cfg(feature = "cache")]
     cache: Option<crate::cache::ResultCache>,
+    #[cfg(feature = "extract")]
+    extraction: Option<Arc<dyn crawl4rs_extract::ExtractionStrategy>>,
 }
 
 impl Crawler {
@@ -32,7 +34,20 @@ impl Crawler {
             pipeline: MarkdownPipeline::new(),
             #[cfg(feature = "cache")]
             cache: None,
+            #[cfg(feature = "extract")]
+            extraction: None,
         }
+    }
+
+    /// Asocia una estrategia de extracción; su salida se guarda en
+    /// [`CrawlResult::extracted`] de cada página.
+    #[cfg(feature = "extract")]
+    pub fn with_extraction(
+        mut self,
+        strategy: Arc<dyn crawl4rs_extract::ExtractionStrategy>,
+    ) -> Self {
+        self.extraction = Some(strategy);
+        self
     }
 
     /// Asocia una caché de resultados; las páginas ya vistas no se vuelven a
@@ -79,13 +94,27 @@ impl Crawler {
             .run(&page.html, &opts)
             .map_err(|e| crate::error::Error::Markdown(e.to_string()))?;
 
+        #[cfg(feature = "extract")]
+        let extracted = match &self.extraction {
+            Some(strategy) => match strategy.extract(&page.html, &output.markdown).await {
+                Ok(value) => Some(value),
+                Err(e) => {
+                    tracing::warn!(error = %e, "la extracción falló; se omite");
+                    None
+                }
+            },
+            None => None,
+        };
+        #[cfg(not(feature = "extract"))]
+        let extracted = None;
+
         Ok(CrawlResult {
             url: page.url,
             status: page.status,
             html: page.html,
             markdown: output.markdown,
             fit_markdown: output.fit_markdown,
-            extracted: None,
+            extracted,
             links: output.links,
         })
     }

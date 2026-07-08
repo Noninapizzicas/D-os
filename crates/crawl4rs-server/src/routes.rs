@@ -9,7 +9,7 @@ use axum::{middleware, Json, Router};
 use serde::Deserialize;
 use std::sync::Arc;
 
-use crawl4rs_core::CrawlConfig;
+use crawl4rs_core::{CrawlConfig, CssSelectorStrategy, FieldSpec, SemanticDensityStrategy};
 
 use crate::auth::require_jwt;
 use crate::dto::{CrawlAccepted, CrawlRequest, JobResult, PageOut, TokenResponse};
@@ -78,7 +78,20 @@ async fn create_crawl(
         ..Default::default()
     };
 
-    let crawler = state.crawler.clone();
+    // Extracción por trabajo: clona el crawler compartido y le añade la
+    // estrategia pedida sin afectar a otros trabajos.
+    let mut crawler = state.crawler.clone();
+    if !req.extract_css.is_empty() {
+        let fields = req
+            .extract_css
+            .iter()
+            .map(|(name, sel)| FieldSpec::text(name.clone(), sel.clone()))
+            .collect();
+        crawler = crawler.with_extraction(std::sync::Arc::new(CssSelectorStrategy::new(fields)));
+    } else if req.extract_semantic {
+        crawler = crawler.with_extraction(std::sync::Arc::new(SemanticDensityStrategy::new()));
+    }
+
     let url = req.url.clone();
     let job_task = job.clone();
     tokio::spawn(async move {
@@ -115,6 +128,7 @@ async fn run_job(crawler: crawl4rs_core::Crawler, url: String, config: CrawlConf
                 .map(|p| PageOut {
                     url: p.url,
                     fit_markdown: p.fit_markdown,
+                    extracted: p.extracted,
                 })
                 .collect();
             let errors = report

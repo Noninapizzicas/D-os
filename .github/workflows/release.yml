@@ -1,0 +1,52 @@
+name: Release
+
+# Publica binarios de `crawl4rs` al empujar un tag `vX.Y.Z`.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-13
+            target: x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar toolchain de Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cachear dependencias
+        uses: Swatinem/rust-cache@v2
+
+      - name: Compilar (release)
+        run: cargo build --release --bin crawl4rs --target ${{ matrix.target }}
+
+      - name: Empaquetar
+        shell: bash
+        run: |
+          bin=target/${{ matrix.target }}/release/crawl4rs
+          pkg=crawl4rs-${{ matrix.target }}.tar.gz
+          tar -czf "$pkg" -C "$(dirname "$bin")" crawl4rs
+          echo "PKG=$pkg" >> "$GITHUB_ENV"
+
+      - name: Adjuntar al Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.PKG }}
+          fail_on_unmatched_files: true
