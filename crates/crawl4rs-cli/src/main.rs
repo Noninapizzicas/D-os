@@ -15,7 +15,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 use tracing_subscriber::EnvFilter;
 
 use crawl4rs_core::{
-    BrowserFetcher, CrawlConfig, Crawler, DeepStrategy, ResultCache, StaticFetcher,
+    BrowserFetcher, CrawlConfig, Crawler, DeepStrategy, ResultCache, StaticFetcher, StealthConfig,
+    StealthEngine,
 };
 
 #[derive(Parser)]
@@ -64,6 +65,9 @@ struct CrawlArgs {
     /// Directorio de caché en disco (RAM + sled); reutiliza páginas ya vistas.
     #[arg(long)]
     cache: Option<String>,
+    /// Activa el modo stealth (rotación de fingerprint + comportamiento humano).
+    #[arg(long)]
+    stealth: bool,
 }
 
 #[derive(clap::Args)]
@@ -91,6 +95,9 @@ struct DeepArgs {
     /// Directorio de caché en disco (RAM + sled); reutiliza páginas ya vistas.
     #[arg(long)]
     cache: Option<String>,
+    /// Activa el modo stealth (rotación de fingerprint + comportamiento humano).
+    #[arg(long)]
+    stealth: bool,
     /// Imprime el informe completo como JSON.
     #[arg(long)]
     json: bool,
@@ -144,14 +151,23 @@ fn open_cache(dir: &Option<String>) -> Result<Option<ResultCache>> {
     }
 }
 
-/// Ejecuta `f` con un crawler de navegador (con caché opcional), cerrando
-/// Chromium de forma ordenada al terminar (aunque `f` devuelva error).
-async fn with_browser<F, Fut, T>(timeout_ms: u64, cache: Option<ResultCache>, f: F) -> Result<T>
+/// Ejecuta `f` con un crawler de navegador (caché y stealth opcionales),
+/// cerrando Chromium de forma ordenada al terminar (aunque `f` devuelva error).
+async fn with_browser<F, Fut, T>(
+    timeout_ms: u64,
+    cache: Option<ResultCache>,
+    stealth: bool,
+    f: F,
+) -> Result<T>
 where
     F: FnOnce(Crawler) -> Fut,
     Fut: std::future::Future<Output = Result<T>>,
 {
-    let fetcher = Arc::new(BrowserFetcher::new().with_timeout(Duration::from_millis(timeout_ms)));
+    let mut fetcher = BrowserFetcher::new().with_timeout(Duration::from_millis(timeout_ms));
+    if stealth {
+        fetcher = fetcher.with_stealth(Arc::new(StealthEngine::new(StealthConfig::default())));
+    }
+    let fetcher = Arc::new(fetcher);
     let mut crawler = Crawler::new(fetcher.clone());
     if let Some(cache) = cache.clone() {
         crawler = crawler.with_cache(cache);
@@ -178,9 +194,12 @@ async fn run_crawl(args: CrawlArgs) -> Result<()> {
         None => {
             let url = args.url.clone();
             let cache = open_cache(&args.cache)?;
-            with_browser(config.timeout_ms, cache, |crawler| async move {
-                Ok(crawler.crawl(&url, &config).await?)
-            })
+            with_browser(
+                config.timeout_ms,
+                cache,
+                args.stealth,
+                |crawler| async move { Ok(crawler.crawl(&url, &config).await?) },
+            )
             .await?
         }
     };
@@ -203,14 +222,18 @@ async fn run_deep(args: DeepArgs) -> Result<()> {
         deep_strategy: args.strategy.into(),
         same_domain: !args.cross_domain,
         concurrency: args.concurrency,
+        stealth: args.stealth,
         ..Default::default()
     };
 
     let url = args.url.clone();
     let cache = open_cache(&args.cache)?;
-    let report = with_browser(config.timeout_ms, cache, |crawler| async move {
-        Ok(crawler.crawl_deep(&url, &config).await?)
-    })
+    let report = with_browser(
+        config.timeout_ms,
+        cache,
+        args.stealth,
+        |crawler| async move { Ok(crawler.crawl_deep(&url, &config).await?) },
+    )
     .await?;
 
     if args.json {

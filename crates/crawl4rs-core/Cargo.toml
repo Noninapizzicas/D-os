@@ -10,14 +10,16 @@ authors.workspace = true
 
 [features]
 default = ["browser", "cache"]
-# Fetcher real vía Chromium/CDP. Desactivable para builds ligeros sin navegador.
-browser = ["dep:chromiumoxide", "dep:tokio"]
+# Fetcher real vía Chromium/CDP, con modo stealth. Desactivable para builds
+# ligeros sin navegador.
+browser = ["dep:chromiumoxide", "dep:tokio", "dep:crawl4rs-stealth"]
 # Caché de resultados (RAM + disco con sled).
 cache = ["dep:crawl4rs-cache"]
 
 [dependencies]
 crawl4rs-markdown.workspace = true
 crawl4rs-cache = { workspace = true, optional = true }
+crawl4rs-stealth = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

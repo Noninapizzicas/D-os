@@ -56,10 +56,16 @@ repositorio.
       misma firma de DOM.
 - [ ] TTL adaptativo por cabeceras `Cache-Control`.
 
-## Fase 5 — Stealth y anti-detección
+## Fase 5 — Stealth y anti-detección · 🟡 en curso
 - [x] Catálogo de fingerprints y `StealthConfig`.
-- [ ] Integrar `chaser-oxide` (CDP endurecido).
-- [ ] Rotación de fingerprint y emulación de comportamiento humano.
+- [x] `StealthEngine`: rotación round-robin de fingerprint, script de
+      ocultación (neutraliza `navigator.webdriver`, `languages`, `platform`,
+      `plugins`, vendor de WebGL, `window.chrome`) y retardos "humanos"
+      deterministas (xorshift).
+- [x] Aplicación vía CDP en `BrowserPool`: UA/idioma/viewport por página,
+      `addScriptToEvaluateOnNewDocument` antes de navegar, movimiento de ratón
+      y pausas. Flag `--stealth` en la CLI.
+- [ ] CDP endurecido a la manera de `chaser-oxide` (patch de más señales CDP).
 - [ ] Proxies rotativos.
 
 ## Fase 6 — API, CLI y dashboard

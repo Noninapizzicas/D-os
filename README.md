@@ -28,10 +28,13 @@ funciona hoy, compilando y con tests en verde:
 - 🗃️ **Caché de dos niveles**: LRU en RAM + `sled` en disco (`TieredCache`),
   integrada en el crawler para no reprocesar páginas ya vistas.
 - ⚡ **Concurrencia acotada** en `crawl_many` y crawl profundo.
+- 🥷 **Modo stealth**: rotación de fingerprint, script anti-detección
+  (`navigator.webdriver`, WebGL, plugins…) y comportamiento humano, aplicado
+  vía CDP. Flag `--stealth`.
 - 🖥️ **CLI** `crawl4rs` con los subcomandos `crawl`, `deep`, `serve`, `config`.
 
-Marcadores de posición documentados para las fases siguientes: stealth
-(`chaser-oxide`), API (`axum`) y extracción con LLM local (`candle`).
+Marcadores de posición documentados para las fases siguientes: API (`axum`)
+con dashboard y extracción con LLM local (`candle`).
 
 ## Instalación y uso
 
@@ -51,6 +54,9 @@ crawl4rs deep https://ejemplo.com --strategy dfs --cross-domain --json
 
 # Con caché en disco (RAM + sled): la segunda pasada reutiliza lo ya visto
 crawl4rs deep https://ejemplo.com --cache ./.crawl4rs-cache --concurrency 8
+
+# Modo stealth: fingerprint rotado + comportamiento humano frente a WAFs
+crawl4rs crawl https://ejemplo.com --stealth
 
 # Procesar un HTML local sin lanzar navegador
 crawl4rs crawl https://ejemplo.com --html-file pagina.html

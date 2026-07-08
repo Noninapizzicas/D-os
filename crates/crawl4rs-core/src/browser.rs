@@ -8,16 +8,23 @@
 //!   disco (JSON).
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use chromiumoxide::browser::{Browser, BrowserConfig};
-use chromiumoxide::cdp::browser_protocol::network::CookieParam;
+use chromiumoxide::cdp::browser_protocol::emulation::SetDeviceMetricsOverrideParams;
+use chromiumoxide::cdp::browser_protocol::network::{CookieParam, SetUserAgentOverrideParams};
+use chromiumoxide::cdp::browser_protocol::page::AddScriptToEvaluateOnNewDocumentParams;
+use chromiumoxide::layout::Point;
 use chromiumoxide::page::Page;
 use futures::StreamExt;
 use tokio::sync::{OnceCell, Semaphore};
 use tokio::task::JoinHandle;
+use tokio::time::sleep;
 use tracing::{debug, info, warn};
+
+pub use crawl4rs_stealth::{Fingerprint, StealthConfig, StealthEngine};
 
 use crate::error::{Error, Result};
 use crate::fetch::{FetchedPage, Fetcher};
@@ -49,6 +56,9 @@ pub struct BrowserPoolConfig {
     /// temporal único, lo que permite varios pools simultáneos sin que
     /// compitan por el perfil por defecto de Chromium.
     pub user_data_dir: Option<PathBuf>,
+    /// Motor stealth. Si está presente, cada descarga aplica un fingerprint
+    /// rotado, inyecta el script de ocultación y añade retardos "humanos".
+    pub stealth: Option<Arc<StealthEngine>>,
 }
 
 impl Default for BrowserPoolConfig {
@@ -60,6 +70,7 @@ impl Default for BrowserPoolConfig {
             max_concurrent_pages: 4,
             window: (1280, 800),
             user_data_dir: None,
+            stealth: None,
         }
     }
 }
@@ -97,6 +108,7 @@ pub struct BrowserPool {
     browser: Browser,
     handler_task: JoinHandle<()>,
     pages: Semaphore,
+    stealth: Option<Arc<StealthEngine>>,
 }
 
 impl BrowserPool {
@@ -147,6 +159,7 @@ impl BrowserPool {
             browser,
             handler_task,
             pages: Semaphore::new(config.max_concurrent_pages.max(1)),
+            stealth: config.stealth.clone(),
         })
     }
 
@@ -172,16 +185,41 @@ impl BrowserPool {
     }
 
     async fn fetch_inner(&self, url: &str) -> Result<FetchedPage> {
-        let page = self
-            .browser
-            .new_page(url)
-            .await
-            .map_err(|e| Error::fetch(url, e))?;
+        // Con stealth: abre una pestaña en blanco, aplica el fingerprint y el
+        // script de ocultación *antes* de navegar, y añade retardos humanos.
+        let page = match &self.stealth {
+            Some(engine) => {
+                let page = self
+                    .browser
+                    .new_page("about:blank")
+                    .await
+                    .map_err(|e| Error::fetch(url, e))?;
+                self.apply_stealth(&page, engine).await;
+                sleep(engine.next_delay()).await;
+                page.goto(url).await.map_err(|e| Error::fetch(url, e))?;
+                page
+            }
+            None => self
+                .browser
+                .new_page(url)
+                .await
+                .map_err(|e| Error::fetch(url, e))?,
+        };
 
         // Espera al evento `load`; si la página ya cargó, vuelve al instante.
         // Un fallo aquí no es fatal: aún podemos leer el contenido actual.
         if let Err(e) = page.wait_for_navigation().await {
             debug!(error = %e, "wait_for_navigation falló; se continúa");
+        }
+
+        // Comportamiento "humano": un movimiento de ratón y una pausa.
+        if let Some(engine) = &self.stealth {
+            let fp = engine.next_fingerprint();
+            let (w, h) = fp.viewport;
+            let _ = page
+                .move_mouse(Point::new((w / 3) as f64, (h / 3) as f64))
+                .await;
+            sleep(engine.next_delay()).await;
         }
 
         let html = page.content().await.map_err(|e| Error::fetch(url, e))?;
@@ -201,6 +239,33 @@ impl BrowserPool {
             status: None,
             html,
         })
+    }
+
+    /// Aplica fingerprint (UA/idioma/plataforma/viewport) y script de
+    /// ocultación a una pestaña recién abierta, antes de navegar.
+    async fn apply_stealth(&self, page: &Page, engine: &StealthEngine) {
+        let fp = engine.next_fingerprint();
+
+        let ua = SetUserAgentOverrideParams {
+            user_agent: fp.user_agent.clone(),
+            accept_language: Some(fp.accept_language.clone()),
+            platform: Some(fp.platform.clone()),
+            user_agent_metadata: None,
+        };
+        if let Err(e) = page.execute(ua).await {
+            debug!(error = %e, "no se pudo fijar el User-Agent stealth");
+        }
+
+        let (w, h) = fp.viewport;
+        let metrics = SetDeviceMetricsOverrideParams::new(w as i64, h as i64, 1.0, false);
+        if let Err(e) = page.execute(metrics).await {
+            debug!(error = %e, "no se pudo fijar el viewport stealth");
+        }
+
+        let script = AddScriptToEvaluateOnNewDocumentParams::new(engine.script_for(&fp));
+        if let Err(e) = page.execute(script).await {
+            debug!(error = %e, "no se pudo inyectar el script stealth");
+        }
     }
 
     /// Abre una pestaña sin cerrarla, para uso avanzado (sesiones, JS).
@@ -279,6 +344,12 @@ impl BrowserFetcher {
     /// Fija el tiempo máximo de carga por página.
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
+        self
+    }
+
+    /// Activa el modo stealth con el motor indicado.
+    pub fn with_stealth(mut self, engine: Arc<StealthEngine>) -> Self {
+        self.config.stealth = Some(engine);
         self
     }
 

@@ -29,7 +29,8 @@ pub mod result;
 
 #[cfg(feature = "browser")]
 pub use browser::{
-    detect_chrome_executable, BrowserFetcher, BrowserPool, BrowserPoolConfig, SessionManager,
+    detect_chrome_executable, BrowserFetcher, BrowserPool, BrowserPoolConfig, Fingerprint,
+    SessionManager, StealthConfig, StealthEngine,
 };
 #[cfg(feature = "cache")]
 pub use cache::ResultCache;
