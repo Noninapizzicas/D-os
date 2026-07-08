@@ -54,36 +54,55 @@ impl Crawler {
         frontier.push_back((normalize(seed_url.clone()), 0));
 
         let mut report = DeepReport::default();
+        let concurrency = config.concurrency.max(1);
 
-        while report.pages.len() < config.max_pages {
-            // BFS toma del frente; DFS del final (LIFO).
-            let next = match config.deep_strategy {
-                DeepStrategy::Bfs => frontier.pop_front(),
-                DeepStrategy::Dfs => frontier.pop_back(),
-            };
-            let Some((url, depth)) = next else { break };
-
-            if !visited.insert(url.clone()) {
-                continue;
+        while report.pages.len() < config.max_pages && !frontier.is_empty() {
+            // Toma una oleada de URLs nuevas, sin exceder ni la concurrencia
+            // ni el presupuesto restante de páginas.
+            let cap = concurrency.min(config.max_pages - report.pages.len());
+            let mut batch: Vec<(String, usize)> = Vec::with_capacity(cap);
+            while batch.len() < cap {
+                // BFS toma del frente; DFS del final (LIFO).
+                let next = match config.deep_strategy {
+                    DeepStrategy::Bfs => frontier.pop_front(),
+                    DeepStrategy::Dfs => frontier.pop_back(),
+                };
+                let Some((url, depth)) = next else { break };
+                if visited.insert(url.clone()) {
+                    batch.push((url, depth));
+                }
+            }
+            if batch.is_empty() {
+                break;
             }
 
-            match self.crawl(&url, config).await {
-                Ok(result) => {
-                    if depth < config.max_depth {
-                        self.enqueue_links(
-                            &result,
-                            depth,
-                            &seed_host,
-                            config,
-                            &visited,
-                            &mut frontier,
-                        );
+            // Descarga la oleada en paralelo; `join_all` preserva el orden.
+            let fetched = futures::future::join_all(
+                batch
+                    .iter()
+                    .map(|(url, depth)| async move { (*depth, self.crawl(url, config).await) }),
+            )
+            .await;
+
+            for ((url, depth), (_, res)) in batch.into_iter().zip(fetched) {
+                match res {
+                    Ok(result) => {
+                        if depth < config.max_depth {
+                            self.enqueue_links(
+                                &result,
+                                depth,
+                                &seed_host,
+                                config,
+                                &visited,
+                                &mut frontier,
+                            );
+                        }
+                        report.pages.push(result);
                     }
-                    report.pages.push(result);
-                }
-                Err(e) => {
-                    warn!(url = %url, error = %e, "página omitida en crawl profundo");
-                    report.errors.push((url, e.to_string()));
+                    Err(e) => {
+                        warn!(url = %url, error = %e, "página omitida en crawl profundo");
+                        report.errors.push((url, e.to_string()));
+                    }
                 }
             }
         }

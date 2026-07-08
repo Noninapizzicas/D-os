@@ -40,11 +40,21 @@ repositorio.
 - [ ] Integrar `readability` (artículo principal).
 - [ ] `LlmExtractionStrategy` con `candle` (ONNX local).
 
-## Fase 4 — Caché y optimización
+## Fase 4 — Caché y optimización · 🟡 en curso
 - [x] `MemoryCache` (LRU en RAM).
-- [ ] `DiskCache` con `sled`.
-- [ ] `PredictiveCache` por hash de DOM.
-- [ ] Concurrencia masiva con `tokio`; TTL adaptativo por `Cache-Control`.
+- [x] `DiskCache` con `sled` (valores JSON, persistente entre ejecuciones).
+- [x] `TieredCache`: RAM por delante de disco, con promoción.
+- [x] `ResultCache` integrada en `Crawler` (feature `cache`): las páginas ya
+      vistas no se descargan ni reprocesan. Medido: crawl profundo de 4
+      páginas ~0,73 s en frío → ~0,06 s en caliente (>10×; ni siquiera se
+      lanza Chromium).
+- [x] Concurrencia acotada: `crawl_many` y `crawl_deep` descargan en paralelo
+      (`config.concurrency`), recorrido por oleadas.
+- [x] `dom_signature` (en `crawl4rs-markdown`): firma estructural del DOM,
+      base de la caché predictiva por plantilla.
+- [ ] `PredictiveCache`: reutilizar lógica de extracción entre URLs con la
+      misma firma de DOM.
+- [ ] TTL adaptativo por cabeceras `Cache-Control`.
 
 ## Fase 5 — Stealth y anti-detección
 - [x] Catálogo de fingerprints y `StealthConfig`.

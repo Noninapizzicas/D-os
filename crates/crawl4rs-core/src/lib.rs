@@ -18,6 +18,8 @@
 
 #[cfg(feature = "browser")]
 pub mod browser;
+#[cfg(feature = "cache")]
+pub mod cache;
 pub mod config;
 pub mod crawler;
 pub mod deep;
@@ -29,6 +31,8 @@ pub mod result;
 pub use browser::{
     detect_chrome_executable, BrowserFetcher, BrowserPool, BrowserPoolConfig, SessionManager,
 };
+#[cfg(feature = "cache")]
+pub use cache::ResultCache;
 pub use config::{CrawlConfig, DeepStrategy};
 pub use crawler::Crawler;
 pub use deep::DeepReport;

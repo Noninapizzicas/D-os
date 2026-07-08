@@ -53,6 +53,9 @@ url = "2"
 lru = "0.12"
 clap = { version = "4", features = ["derive"] }
 
+# Caché persistente en disco
+sled = "0.34"
+
 [profile.release]
 # Objetivo de la visión: binario estático pequeño (< 20 MB en imagen Docker).
 opt-level = "z"

@@ -25,12 +25,13 @@ funciona hoy, compilando y con tests en verde:
   **BM25** (Okapi, implementado desde cero) para filtrar por relevancia a una
   consulta.
 - 🧩 **Estrategias de extracción**: selectores CSS y densidad semántica.
-- 🗃️ **Caché LRU** en memoria.
+- 🗃️ **Caché de dos niveles**: LRU en RAM + `sled` en disco (`TieredCache`),
+  integrada en el crawler para no reprocesar páginas ya vistas.
+- ⚡ **Concurrencia acotada** en `crawl_many` y crawl profundo.
 - 🖥️ **CLI** `crawl4rs` con los subcomandos `crawl`, `deep`, `serve`, `config`.
 
-Marcadores de posición documentados para las fases siguientes: caché en disco
-(`sled`), stealth (`chaser-oxide`), API (`axum`) y extracción con LLM local
-(`candle`).
+Marcadores de posición documentados para las fases siguientes: stealth
+(`chaser-oxide`), API (`axum`) y extracción con LLM local (`candle`).
 
 ## Instalación y uso
 
@@ -47,6 +48,9 @@ crawl4rs crawl https://ejemplo.com --fit --query "rust async runtime"
 # Crawl profundo: sigue enlaces del mismo dominio (BFS por defecto)
 crawl4rs deep https://ejemplo.com --max-depth 2 --max-pages 25
 crawl4rs deep https://ejemplo.com --strategy dfs --cross-domain --json
+
+# Con caché en disco (RAM + sled): la segunda pasada reutiliza lo ya visto
+crawl4rs deep https://ejemplo.com --cache ./.crawl4rs-cache --concurrency 8
 
 # Procesar un HTML local sin lanzar navegador
 crawl4rs crawl https://ejemplo.com --html-file pagina.html

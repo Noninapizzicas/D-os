@@ -14,7 +14,9 @@ use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 use tracing_subscriber::EnvFilter;
 
-use crawl4rs_core::{BrowserFetcher, CrawlConfig, Crawler, DeepStrategy, StaticFetcher};
+use crawl4rs_core::{
+    BrowserFetcher, CrawlConfig, Crawler, DeepStrategy, ResultCache, StaticFetcher,
+};
 
 #[derive(Parser)]
 #[command(
@@ -59,6 +61,9 @@ struct CrawlArgs {
     /// Imprime el resultado completo como JSON.
     #[arg(long)]
     json: bool,
+    /// Directorio de caché en disco (RAM + sled); reutiliza páginas ya vistas.
+    #[arg(long)]
+    cache: Option<String>,
 }
 
 #[derive(clap::Args)]
@@ -77,9 +82,15 @@ struct DeepArgs {
     /// Profundidad máxima (0 = sólo la semilla).
     #[arg(long, default_value_t = 2)]
     max_depth: usize,
+    /// Descargas simultáneas.
+    #[arg(long, default_value_t = 4)]
+    concurrency: usize,
     /// Seguir también enlaces a otros dominios.
     #[arg(long)]
     cross_domain: bool,
+    /// Directorio de caché en disco (RAM + sled); reutiliza páginas ya vistas.
+    #[arg(long)]
+    cache: Option<String>,
     /// Imprime el informe completo como JSON.
     #[arg(long)]
     json: bool,
@@ -125,16 +136,30 @@ async fn main() -> Result<()> {
     }
 }
 
-/// Ejecuta `f` con un crawler de navegador, cerrando Chromium de forma
-/// ordenada al terminar (aunque `f` devuelva error).
-async fn with_browser<F, Fut, T>(timeout_ms: u64, f: F) -> Result<T>
+/// Abre la caché de resultados en `dir`, si se indicó.
+fn open_cache(dir: &Option<String>) -> Result<Option<ResultCache>> {
+    match dir {
+        Some(path) => Ok(Some(ResultCache::open(path, 1024)?)),
+        None => Ok(None),
+    }
+}
+
+/// Ejecuta `f` con un crawler de navegador (con caché opcional), cerrando
+/// Chromium de forma ordenada al terminar (aunque `f` devuelva error).
+async fn with_browser<F, Fut, T>(timeout_ms: u64, cache: Option<ResultCache>, f: F) -> Result<T>
 where
     F: FnOnce(Crawler) -> Fut,
     Fut: std::future::Future<Output = Result<T>>,
 {
     let fetcher = Arc::new(BrowserFetcher::new().with_timeout(Duration::from_millis(timeout_ms)));
-    let crawler = Crawler::new(fetcher.clone());
+    let mut crawler = Crawler::new(fetcher.clone());
+    if let Some(cache) = cache.clone() {
+        crawler = crawler.with_cache(cache);
+    }
     let out = f(crawler).await;
+    if let Some(cache) = cache {
+        cache.flush();
+    }
     if let Ok(fetcher) = Arc::try_unwrap(fetcher) {
         fetcher.shutdown().await;
     }
@@ -152,7 +177,8 @@ async fn run_crawl(args: CrawlArgs) -> Result<()> {
         }
         None => {
             let url = args.url.clone();
-            with_browser(config.timeout_ms, |crawler| async move {
+            let cache = open_cache(&args.cache)?;
+            with_browser(config.timeout_ms, cache, |crawler| async move {
                 Ok(crawler.crawl(&url, &config).await?)
             })
             .await?
@@ -176,11 +202,13 @@ async fn run_deep(args: DeepArgs) -> Result<()> {
         max_depth: args.max_depth,
         deep_strategy: args.strategy.into(),
         same_domain: !args.cross_domain,
+        concurrency: args.concurrency,
         ..Default::default()
     };
 
     let url = args.url.clone();
-    let report = with_browser(config.timeout_ms, |crawler| async move {
+    let cache = open_cache(&args.cache)?;
+    let report = with_browser(config.timeout_ms, cache, |crawler| async move {
         Ok(crawler.crawl_deep(&url, &config).await?)
     })
     .await?;

@@ -30,6 +30,10 @@ pub enum Error {
     #[error("fallo del navegador: {0}")]
     Browser(String),
 
+    /// Fallo de la capa de caché (disco/serialización).
+    #[error("fallo de caché: {0}")]
+    Cache(String),
+
     /// Funcionalidad planificada pero aún no implementada (ver hoja de ruta).
     #[error("no implementado todavía: {0}")]
     NotImplemented(&'static str),
