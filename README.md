@@ -106,12 +106,20 @@ Endpoints: `POST /auth/token`, `POST /crawl`, `GET /crawl/{id}/status`,
 ### Docker
 
 ```bash
+# Imagen por defecto: Debian slim + Chromium — el modo navegador funciona
+# de fábrica (`crawl`, `deep`, `serve`).
 docker build -t crawl4rs .
 docker run -p 8080:8080 -e CRAWL4RS_JWT_SECRET=… crawl4rs
+
+# Imagen mínima (distroless, sin navegador) para procesar HTML ya obtenido
+# o servir la API sin `crawl <url>`:
+docker build --target minimal -t crawl4rs:minimal .
 ```
 
-La imagen (`distroless/cc`) empaqueta sólo el binario; para el modo navegador
-aporta un Chromium accesible y apunta `CRAWL4RS_CHROME` a él.
+### Binarios precompilados
+
+Cada tag `vX.Y.Z` publica binarios para Linux y macOS (x86-64 y arm64) vía
+GitHub Actions (`.github/workflows/release.yml`).
 
 ### Como biblioteca
 

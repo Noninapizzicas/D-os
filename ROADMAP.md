@@ -83,8 +83,11 @@ repositorio.
 - [x] Autenticación JWT (HS256, `rust_crypto`): `POST /auth/token` con
       `x-api-key`, middleware `Bearer` en las rutas protegidas.
 - [x] Dashboard web mínimo embebido (`GET /dashboard`).
-- [x] `Dockerfile` multi-etapa con imagen `distroless/cc` (binario ~6 MB;
-      el navegador se aporta aparte).
+- [x] `Dockerfile` multi-etapa **probado** (build en `rust:1-bookworm` →
+      runtime): imagen por defecto Debian slim + Chromium (~123 MB, el modo
+      navegador funciona de fábrica) y target `minimal` distroless sin
+      navegador. Builder fijado a bookworm para alinear glibc con el runtime.
+- [x] Workflow de releases (`release.yml`): binarios Linux/macOS por tag.
 - [ ] Endurecer el secreto JWT (safe-by-default): sin `CRAWL4RS_JWT_SECRET`,
       generar uno ALEATORIO en el arranque y avisarlo por log — nunca el default
       conocido `crawl4rs-dev-secret-cambia-esto` (hoy forjable por cualquiera).
