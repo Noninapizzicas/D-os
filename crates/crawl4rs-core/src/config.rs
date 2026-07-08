@@ -13,6 +13,19 @@ pub enum DeepStrategy {
     Dfs,
 }
 
+/// Cómo se descarga cada página.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FetchMode {
+    /// HTTP puro (rápido, sin navegador). Falla ante challenges/JS.
+    Fast,
+    /// Navegador headless + stealth (lento, robusto).
+    Browser,
+    /// Intenta HTTP; escala a navegador sólo ante 403/challenge. Por defecto.
+    #[default]
+    Auto,
+}
+
 /// Parámetros que controlan un crawl individual.
 ///
 /// Se construye con valores por defecto sensatos y se ajusta con el patrón
@@ -62,6 +75,9 @@ pub struct CrawlConfig {
 
     /// Activa el modo stealth (anti-detección). Ver `crawl4rs-stealth`.
     pub stealth: bool,
+
+    /// Cómo se descarga cada página (rápido/navegador/auto).
+    pub mode: FetchMode,
 }
 
 impl Default for CrawlConfig {
@@ -77,6 +93,7 @@ impl Default for CrawlConfig {
             concurrency: 4,
             timeout_ms: 30_000,
             stealth: false,
+            mode: FetchMode::default(),
         }
     }
 }

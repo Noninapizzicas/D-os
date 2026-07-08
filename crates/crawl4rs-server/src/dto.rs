@@ -3,14 +3,41 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crawl4rs_core::FetchMode;
+
+/// Especificación de un campo de extracción por CSS. Admite dos formas
+/// (aditivo, sin romper clientes existentes):
+/// - `"h1"` → texto del selector.
+/// - `{ "selector": "img", "attr": "src", "many": true }` → atributo/colección.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum FieldSpecDto {
+    /// Selector simple: extrae el texto de la primera coincidencia.
+    Text(String),
+    /// Selector con atributo y/o colección.
+    Detailed {
+        /// Selector CSS.
+        selector: String,
+        /// Atributo a leer (`src`, `href`, `data-...`); `None` → texto.
+        #[serde(default)]
+        attr: Option<String>,
+        /// Si `true`, recoge todas las coincidencias en un array.
+        #[serde(default)]
+        many: bool,
+    },
+}
+
 /// Cuerpo de `POST /crawl`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct CrawlRequest {
     /// URL semilla a procesar.
     pub url: String,
     /// Consulta opcional para el filtrado por relevancia (BM25).
     #[serde(default)]
     pub query: Option<String>,
+    /// Modo de descarga: `fast` | `browser` | `auto` (por defecto).
+    #[serde(default)]
+    pub mode: FetchMode,
     /// Profundidad máxima (0 = sólo la semilla).
     #[serde(default)]
     pub max_depth: usize,
@@ -23,10 +50,10 @@ pub struct CrawlRequest {
     /// Seguir enlaces a otros dominios.
     #[serde(default)]
     pub cross_domain: bool,
-    /// Extracción por CSS: mapa `nombre → selector`. Si está presente, cada
-    /// página incluye los campos extraídos en `extracted`.
+    /// Extracción por CSS: mapa `nombre → selector | {selector, attr, many}`.
+    /// Si está presente, cada página incluye los campos en `extracted`.
     #[serde(default)]
-    pub extract_css: std::collections::HashMap<String, String>,
+    pub extract_css: std::collections::HashMap<String, FieldSpecDto>,
     /// Extrae el contenido principal por densidad semántica.
     #[serde(default)]
     pub extract_semantic: bool,

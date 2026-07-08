@@ -45,8 +45,11 @@ completa (mdBook).
 # Compilar
 cargo build --release
 
-# Crawl real: lanza Chromium headless, navega y convierte a Markdown
+# Crawl real (modo auto por defecto): intenta HTTP puro y sólo escala a
+# navegador ante 403/challenge — sin abrir Chromium para páginas simples.
 crawl4rs crawl https://ejemplo.com
+crawl4rs crawl https://ejemplo.com --mode fast      # HTTP puro, sin navegador
+crawl4rs crawl https://ejemplo.com --mode browser   # fuerza el navegador
 
 # Sólo el "fit_markdown", filtrado por relevancia a una consulta
 crawl4rs crawl https://ejemplo.com --fit --query "rust async runtime"
@@ -61,9 +64,10 @@ crawl4rs deep https://ejemplo.com --cache ./.crawl4rs-cache --concurrency 8
 # Modo stealth: fingerprint rotado + comportamiento humano frente a WAFs
 crawl4rs crawl https://ejemplo.com --stealth
 
-# Extracción estructurada por CSS (o por densidad semántica con --extract-semantic)
+# Extracción estructurada por CSS: texto, o atributos con `::attr(...)`
 crawl4rs crawl https://tienda.com --json \
-    --extract-css "titulo=h1" --extract-css "precio=.price"
+    --extract-css "titulo=h1" --extract-css "precio=.price" \
+    --extract-css "imagen=img::attr(src)" --extract-css "enlace=a::attr(href)"
 
 # A través de un proxy de salida (añade --insecure si intercepta TLS)
 crawl4rs crawl https://ejemplo.com --proxy 127.0.0.1:8888 --insecure

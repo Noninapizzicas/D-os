@@ -7,18 +7,24 @@ use tracing::{debug, instrument};
 
 use crawl4rs_markdown::{MarkdownPipeline, PipelineOptions};
 
-use crate::config::CrawlConfig;
+use crate::config::{CrawlConfig, FetchMode};
 use crate::error::Result;
-use crate::fetch::Fetcher;
+use crate::fetch::{FetchedPage, Fetcher};
 use crate::result::CrawlResult;
 
 /// El crawler: coordina el flujo `fetch → limpiar → markdown → fit`.
 ///
 /// Es genérico sobre el [`Fetcher`], de modo que el mismo orquestador sirve
 /// para navegador headless, HTTP plano o HTML estático en tests.
+///
+/// Puede llevar dos fetchers (HTTP rápido y navegador) para honrar
+/// [`FetchMode`]: `fast` usa HTTP, `browser` usa el navegador, y `auto`
+/// intenta HTTP y sólo escala al navegador ante un 403/challenge.
 #[derive(Clone)]
 pub struct Crawler {
     fetcher: Arc<dyn Fetcher>,
+    http_fetcher: Option<Arc<dyn Fetcher>>,
+    browser_fetcher: Option<Arc<dyn Fetcher>>,
     pipeline: MarkdownPipeline,
     #[cfg(feature = "cache")]
     cache: Option<crate::cache::ResultCache>,
@@ -27,16 +33,33 @@ pub struct Crawler {
 }
 
 impl Crawler {
-    /// Crea un crawler con el fetcher indicado.
+    /// Crea un crawler con un único fetcher, usado para todos los modos
+    /// (comportamiento retrocompatible).
     pub fn new(fetcher: Arc<dyn Fetcher>) -> Self {
         Self {
             fetcher,
+            http_fetcher: None,
+            browser_fetcher: None,
             pipeline: MarkdownPipeline::new(),
             #[cfg(feature = "cache")]
             cache: None,
             #[cfg(feature = "extract")]
             extraction: None,
         }
+    }
+
+    /// Asocia el fetcher HTTP rápido (usado en modo `fast` y como primer
+    /// intento en `auto`).
+    pub fn with_http_fetcher(mut self, fetcher: Arc<dyn Fetcher>) -> Self {
+        self.http_fetcher = Some(fetcher);
+        self
+    }
+
+    /// Asocia el fetcher de navegador (usado en modo `browser` y como escalada
+    /// en `auto`).
+    pub fn with_browser_fetcher(mut self, fetcher: Arc<dyn Fetcher>) -> Self {
+        self.browser_fetcher = Some(fetcher);
+        self
     }
 
     /// Asocia una estrategia de extracción; su salida se guarda en
@@ -79,9 +102,32 @@ impl Crawler {
         Ok(result)
     }
 
+    /// Elige el fetcher y descarga según [`FetchMode`], con escalada en `auto`.
+    async fn fetch_by_mode(&self, url: &str, mode: FetchMode) -> Result<FetchedPage> {
+        // Sin fetchers específicos, se usa el único fetcher (retrocompat).
+        if self.http_fetcher.is_none() && self.browser_fetcher.is_none() {
+            return self.fetcher.fetch(url).await;
+        }
+        let http = self.http_fetcher.as_ref().unwrap_or(&self.fetcher);
+        let browser = self.browser_fetcher.as_ref().unwrap_or(&self.fetcher);
+
+        match mode {
+            FetchMode::Fast => http.fetch(url).await,
+            FetchMode::Browser => browser.fetch(url).await,
+            FetchMode::Auto => {
+                let page = http.fetch(url).await?;
+                if self.browser_fetcher.is_some() && looks_like_challenge(&page) {
+                    debug!(status = ?page.status, "HTTP topó con challenge; escalando a navegador");
+                    return browser.fetch(url).await;
+                }
+                Ok(page)
+            }
+        }
+    }
+
     /// Descarga y procesa una URL sin consultar ni escribir la caché.
     async fn crawl_uncached(&self, url: &str, config: &CrawlConfig) -> Result<CrawlResult> {
-        let page = self.fetcher.fetch(url).await?;
+        let page = self.fetch_by_mode(url, config.mode).await?;
         debug!(status = ?page.status, bytes = page.html.len(), "página descargada");
 
         let opts = PipelineOptions {
@@ -135,4 +181,23 @@ impl Crawler {
             .collect()
             .await
     }
+}
+
+/// Heurística: ¿la respuesta HTTP parece un muro anti-bot (Cloudflare, etc.)?
+fn looks_like_challenge(page: &FetchedPage) -> bool {
+    if matches!(page.status, Some(403) | Some(429) | Some(503)) {
+        return true;
+    }
+    let h = page.html.to_ascii_lowercase();
+    [
+        "just a moment",
+        "cf-chl",
+        "_cf_chl",
+        "challenge-platform",
+        "checking your browser",
+        "attention required",
+        "enable javascript and cookies",
+    ]
+    .iter()
+    .any(|m| h.contains(m))
 }

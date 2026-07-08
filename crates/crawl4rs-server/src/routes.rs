@@ -71,6 +71,7 @@ async fn create_crawl(
 
     let config = CrawlConfig {
         query: req.query.clone(),
+        mode: req.mode,
         max_depth: req.max_depth,
         max_pages: req.max_pages.max(1),
         concurrency: req.concurrency.max(1),
@@ -85,7 +86,7 @@ async fn create_crawl(
         let fields = req
             .extract_css
             .iter()
-            .map(|(name, sel)| FieldSpec::text(name.clone(), sel.clone()))
+            .map(|(name, spec)| field_spec(name, spec))
             .collect();
         crawler = crawler.with_extraction(std::sync::Arc::new(CssSelectorStrategy::new(fields)));
     } else if req.extract_semantic {
@@ -99,6 +100,28 @@ async fn create_crawl(
     });
 
     Ok((StatusCode::ACCEPTED, Json(CrawlAccepted { id })))
+}
+
+/// Traduce un [`FieldSpecDto`] del DTO a un [`FieldSpec`] del core.
+fn field_spec(name: &str, spec: &crate::dto::FieldSpecDto) -> FieldSpec {
+    use crate::dto::FieldSpecDto;
+    match spec {
+        FieldSpecDto::Text(selector) => FieldSpec::text(name, selector),
+        FieldSpecDto::Detailed {
+            selector,
+            attr,
+            many,
+        } => {
+            let mut f = match attr {
+                Some(a) => FieldSpec::attr(name, selector, a),
+                None => FieldSpec::text(name, selector),
+            };
+            if *many {
+                f = f.all();
+            }
+            f
+        }
+    }
 }
 
 /// Ejecuta el crawl de un trabajo, emitiendo progreso.

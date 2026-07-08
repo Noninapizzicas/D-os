@@ -9,7 +9,7 @@ description = "Núcleo de Crawl4RS: orquestación del crawl (fetch → limpieza 
 authors.workspace = true
 
 [features]
-default = ["browser", "cache", "extract"]
+default = ["browser", "cache", "extract", "http"]
 # Fetcher real vía Chromium/CDP, con modo stealth. Desactivable para builds
 # ligeros sin navegador.
 browser = ["dep:chromiumoxide", "dep:tokio", "dep:crawl4rs-stealth"]
@@ -17,12 +17,15 @@ browser = ["dep:chromiumoxide", "dep:tokio", "dep:crawl4rs-stealth"]
 cache = ["dep:crawl4rs-cache"]
 # Extracción estructurada (CSS, densidad semántica) integrada en el crawler.
 extract = ["dep:crawl4rs-extract"]
+# Fetch HTTP rápido sin navegador (reqwest).
+http = ["dep:reqwest", "dep:tokio"]
 
 [dependencies]
 crawl4rs-markdown.workspace = true
 crawl4rs-cache = { workspace = true, optional = true }
 crawl4rs-stealth = { workspace = true, optional = true }
 crawl4rs-extract = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
