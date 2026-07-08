@@ -154,6 +154,15 @@ impl Crawler {
         #[cfg(not(feature = "extract"))]
         let extracted = None;
 
+        #[cfg(feature = "extract")]
+        let jsonld = if config.extract_jsonld {
+            crawl4rs_extract::extract_jsonld(&page.html)
+        } else {
+            Vec::new()
+        };
+        #[cfg(not(feature = "extract"))]
+        let jsonld = Vec::new();
+
         Ok(CrawlResult {
             url: page.url,
             status: page.status,
@@ -161,8 +170,41 @@ impl Crawler {
             markdown: output.markdown,
             fit_markdown: output.fit_markdown,
             extracted,
+            jsonld,
             links: output.links,
         })
+    }
+
+    /// Devuelve los enlaces de una página (resueltos a absolutos, únicos, sólo
+    /// http/https). Ligero: descarga y extrae enlaces, sin producir Markdown de
+    /// contenido. Base de `POST /map`.
+    pub async fn map(&self, url: &str, config: &CrawlConfig) -> Result<Vec<String>> {
+        use std::collections::HashSet;
+        use url::Url;
+
+        let page = self.fetch_by_mode(url, config.mode).await?;
+        let converted = crawl4rs_markdown::html_to_markdown(&page.html);
+        let base = Url::parse(&page.url).ok();
+
+        let mut seen = HashSet::new();
+        let mut out = Vec::new();
+        for link in converted.links {
+            let abs = match &base {
+                Some(b) => b.join(&link).ok(),
+                None => Url::parse(&link).ok(),
+            };
+            if let Some(mut u) = abs {
+                if !matches!(u.scheme(), "http" | "https") {
+                    continue;
+                }
+                u.set_fragment(None);
+                let s: String = u.into();
+                if seen.insert(s.clone()) {
+                    out.push(s);
+                }
+            }
+        }
+        Ok(out)
     }
 
     /// Descarga y procesa varias URLs con concurrencia acotada.

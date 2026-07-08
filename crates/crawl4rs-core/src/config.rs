@@ -78,6 +78,9 @@ pub struct CrawlConfig {
 
     /// Cómo se descarga cada página (rápido/navegador/auto).
     pub mode: FetchMode,
+
+    /// Extraer los objetos JSON-LD / schema.org de cada página.
+    pub extract_jsonld: bool,
 }
 
 impl Default for CrawlConfig {
@@ -94,6 +97,7 @@ impl Default for CrawlConfig {
             timeout_ms: 30_000,
             stealth: false,
             mode: FetchMode::default(),
+            extract_jsonld: false,
         }
     }
 }

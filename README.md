@@ -69,6 +69,12 @@ crawl4rs crawl https://tienda.com --json \
     --extract-css "titulo=h1" --extract-css "precio=.price" \
     --extract-css "imagen=img::attr(src)" --extract-css "enlace=a::attr(href)"
 
+# JSON-LD / schema.org (fichas de producto sin adivinar selectores)
+crawl4rs crawl https://tienda.com/producto --json --jsonld
+
+# Mapa de enlaces de una página (ligero, sin contenido)
+crawl4rs map https://ejemplo.com
+
 # A través de un proxy de salida (añade --insecure si intercepta TLS)
 crawl4rs crawl https://ejemplo.com --proxy 127.0.0.1:8888 --insecure
 
@@ -104,8 +110,12 @@ curl -s localhost:8080/crawl/$ID/result -H "Authorization: Bearer $TOKEN"
 ```
 
 Endpoints: `POST /auth/token`, `POST /crawl`, `GET /crawl/{id}/status`,
-`GET /crawl/{id}/result`, `GET /crawl/{id}/stream` (WebSocket), `GET /dashboard`,
-`GET /health`.
+`GET /crawl/{id}/result`, `GET /crawl/{id}/stream` (WebSocket), `POST /map`
+(enlaces de una página), `POST /search` (búsqueda web vía SearXNG; requiere
+`SEARXNG_URL`, si no degrada con 503), `GET /dashboard`, `GET /health`.
+
+`POST /crawl` acepta además `mode` (`fast`/`browser`/`auto`), `extract_css`
+(texto o `{selector, attr, many}`) y `extract_jsonld`.
 
 ### Docker
 

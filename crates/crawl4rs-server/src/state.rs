@@ -16,6 +16,9 @@ pub struct AppState {
     pub jobs: Arc<JobManager>,
     /// Configuración de autenticación.
     pub auth: AuthConfig,
+    /// URL base de SearXNG para `POST /search`. `None` → el endpoint degrada
+    /// con 503.
+    pub searxng_url: Option<String>,
 }
 
 impl AppState {
@@ -25,6 +28,13 @@ impl AppState {
             crawler,
             jobs: Arc::new(JobManager::new()),
             auth,
+            searxng_url: None,
         }
+    }
+
+    /// Configura la URL de SearXNG (habilita `POST /search`).
+    pub fn with_searxng(mut self, url: Option<String>) -> Self {
+        self.searxng_url = url.filter(|u| !u.trim().is_empty());
+        self
     }
 }

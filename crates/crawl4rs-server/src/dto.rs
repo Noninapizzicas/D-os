@@ -57,6 +57,9 @@ pub struct CrawlRequest {
     /// Extrae el contenido principal por densidad semántica.
     #[serde(default)]
     pub extract_semantic: bool,
+    /// Extrae los objetos JSON-LD / schema.org de cada página.
+    #[serde(default)]
+    pub extract_jsonld: bool,
 }
 
 fn default_max_pages() -> usize {
@@ -120,6 +123,53 @@ pub struct PageOut {
     /// Datos estructurados extraídos, si se pidió extracción.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extracted: Option<Value>,
+    /// Objetos JSON-LD, si se pidió `extract_jsonld`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub jsonld: Vec<Value>,
+}
+
+/// Cuerpo de `POST /search`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SearchRequest {
+    /// Consulta de búsqueda.
+    pub query: String,
+    /// Máximo de resultados (por defecto 10).
+    #[serde(default = "default_limit")]
+    pub limit: usize,
+}
+
+fn default_limit() -> usize {
+    10
+}
+
+/// Un resultado de búsqueda.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchResult {
+    /// Título del resultado.
+    pub title: String,
+    /// URL.
+    pub url: String,
+    /// Fragmento/resumen.
+    pub snippet: String,
+}
+
+/// Cuerpo de `POST /map`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct MapRequest {
+    /// URL a mapear.
+    pub url: String,
+    /// Modo de descarga (por defecto `auto`).
+    #[serde(default)]
+    pub mode: FetchMode,
+}
+
+/// Respuesta de `POST /map`.
+#[derive(Debug, Clone, Serialize)]
+pub struct MapResponse {
+    /// URL efectiva mapeada.
+    pub url: String,
+    /// Enlaces encontrados (absolutos, únicos).
+    pub links: Vec<String>,
 }
 
 /// Respuesta de `GET /crawl/{id}/result`.

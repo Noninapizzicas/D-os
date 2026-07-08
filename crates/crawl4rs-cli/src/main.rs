@@ -37,6 +37,20 @@ enum Command {
     Crawl(CrawlArgs),
     /// Crawl profundo siguiendo enlaces (BFS/DFS).
     Deep(DeepArgs),
+    /// Lista los enlaces de una página (mapa ligero, sin contenido).
+    Map {
+        /// URL a mapear.
+        url: String,
+        /// Modo de descarga.
+        #[arg(long, value_enum, default_value_t = Mode::Auto)]
+        mode: Mode,
+        /// Proxy de salida.
+        #[arg(long)]
+        proxy: Option<String>,
+        /// Ignora errores de certificado TLS.
+        #[arg(long)]
+        insecure: bool,
+    },
     /// Lanza el servidor API.
     Serve {
         /// Puerto de escucha.
@@ -90,6 +104,9 @@ struct CrawlArgs {
     /// Extrae el contenido principal por densidad semántica.
     #[arg(long)]
     extract_semantic: bool,
+    /// Extrae los objetos JSON-LD / schema.org de la página.
+    #[arg(long)]
+    jsonld: bool,
 }
 
 #[derive(clap::Args)]
@@ -182,6 +199,12 @@ async fn main() -> Result<()> {
     match cli.command {
         Command::Crawl(args) => run_crawl(args).await,
         Command::Deep(args) => run_deep(args).await,
+        Command::Map {
+            url,
+            mode,
+            proxy,
+            insecure,
+        } => run_map(url, mode, proxy, insecure).await,
         Command::Serve {
             port,
             host,
@@ -326,9 +349,30 @@ async fn run_serve(host: String, port: u16, stealth: bool) -> Result<()> {
     Ok(())
 }
 
+async fn run_map(url: String, mode: Mode, proxy: Option<String>, insecure: bool) -> Result<()> {
+    let config = CrawlConfig {
+        mode: mode.into(),
+        ..Default::default()
+    };
+    let u = url.clone();
+    let links = with_browser(
+        config.timeout_ms,
+        None,
+        false,
+        proxy,
+        insecure,
+        None,
+        |crawler| async move { Ok(crawler.map(&u, &config).await?) },
+    )
+    .await?;
+    println!("{}", serde_json::to_string_pretty(&links)?);
+    Ok(())
+}
+
 async fn run_crawl(args: CrawlArgs) -> Result<()> {
     let config = CrawlConfig {
         mode: args.mode.into(),
+        extract_jsonld: args.jsonld,
         ..CrawlConfig::default().with_query(args.query.clone())
     };
 
