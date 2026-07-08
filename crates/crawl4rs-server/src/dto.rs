@@ -1,0 +1,97 @@
+//! Tipos de petición/respuesta de la API.
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+/// Cuerpo de `POST /crawl`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrawlRequest {
+    /// URL semilla a procesar.
+    pub url: String,
+    /// Consulta opcional para el filtrado por relevancia (BM25).
+    #[serde(default)]
+    pub query: Option<String>,
+    /// Profundidad máxima (0 = sólo la semilla).
+    #[serde(default)]
+    pub max_depth: usize,
+    /// Máximo de páginas a visitar.
+    #[serde(default = "default_max_pages")]
+    pub max_pages: usize,
+    /// Descargas simultáneas.
+    #[serde(default = "default_concurrency")]
+    pub concurrency: usize,
+    /// Seguir enlaces a otros dominios.
+    #[serde(default)]
+    pub cross_domain: bool,
+}
+
+fn default_max_pages() -> usize {
+    25
+}
+fn default_concurrency() -> usize {
+    4
+}
+
+/// Estado de un trabajo de crawl.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum JobState {
+    /// En cola, aún no iniciado.
+    Queued,
+    /// En ejecución.
+    Running,
+    /// Terminado con éxito.
+    Done,
+    /// Terminado con error.
+    Failed,
+}
+
+/// Respuesta de `GET /crawl/{id}/status`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobStatus {
+    /// Identificador del trabajo.
+    pub id: String,
+    /// Estado actual.
+    pub state: JobState,
+    /// Páginas completadas.
+    pub completed: usize,
+    /// Mensaje de error, si el estado es `failed`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// Respuesta de `POST /crawl`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrawlAccepted {
+    /// Identificador del trabajo creado.
+    pub id: String,
+}
+
+/// Respuesta de `POST /auth/token`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenResponse {
+    /// El JWT emitido.
+    pub token: String,
+    /// Tipo de token (siempre `Bearer`).
+    pub token_type: String,
+}
+
+/// Una página en el resultado de un trabajo.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PageOut {
+    /// URL efectiva.
+    pub url: String,
+    /// Markdown filtrado, listo para LLM.
+    pub fit_markdown: String,
+}
+
+/// Respuesta de `GET /crawl/{id}/result`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobResult {
+    /// Identificador del trabajo.
+    pub id: String,
+    /// Páginas procesadas.
+    pub pages: Vec<PageOut>,
+    /// Errores por URL.
+    pub errors: Vec<Value>,
+}

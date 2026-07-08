@@ -68,12 +68,18 @@ repositorio.
 - [ ] CDP endurecido a la manera de `chaser-oxide` (patch de más señales CDP).
 - [ ] Proxies rotativos.
 
-## Fase 6 — API, CLI y dashboard
+## Fase 6 — API, CLI y dashboard · 🟡 en curso
 - [x] CLI con `clap` (`crawl`, `deep`, `serve`, `config`).
-- [x] DTOs de la API (`CrawlRequest`, `JobStatus`).
-- [ ] Servidor `axum`: REST + WebSockets.
-- [ ] Dashboard web y autenticación JWT.
-- [ ] Imagen Docker distroless (< 20 MB) y documentación (mdBook).
+- [x] Servidor `axum`: `POST /crawl`, `GET /crawl/{id}/status`,
+      `GET /crawl/{id}/result`, `GET /health`.
+- [x] Streaming de progreso por WebSocket (`GET /crawl/{id}/stream`),
+      alimentado por `crawl_deep_with`.
+- [x] Autenticación JWT (HS256, `rust_crypto`): `POST /auth/token` con
+      `x-api-key`, middleware `Bearer` en las rutas protegidas.
+- [x] Dashboard web mínimo embebido (`GET /dashboard`).
+- [x] `Dockerfile` multi-etapa con imagen `distroless/cc` (binario ~6 MB;
+      el navegador se aporta aparte).
+- [ ] Documentación completa (mdBook).
 
 ## Objetivos de rendimiento
 
