@@ -31,12 +31,14 @@ repositorio.
 - [x] `Bm25Filter`: ranking por relevancia (Okapi BM25 propio).
 - [ ] Comparativa de salida contra Crawl4AI.
 
-## Fase 3 — Extracción estructurada · 🟡 en curso
+## Fase 3 — Extracción estructurada y crawl profundo · 🟡 en curso
 - [x] `CssSelectorStrategy`.
 - [x] `SemanticDensityStrategy`.
+- [x] `deep` (crawl BFS/DFS): recorrido con `Crawler::crawl_deep`, respeta
+      `max_pages`/`max_depth`/estrategia/`same_domain`, resuelve enlaces
+      relativos, deduplica y aísla el dominio. Subcomando `crawl4rs deep`.
 - [ ] Integrar `readability` (artículo principal).
 - [ ] `LlmExtractionStrategy` con `candle` (ONNX local).
-- [ ] `deep` (crawl BFS/DFS).
 
 ## Fase 4 — Caché y optimización
 - [x] `MemoryCache` (LRU en RAM).

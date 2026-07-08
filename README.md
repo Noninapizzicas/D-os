@@ -44,6 +44,10 @@ crawl4rs crawl https://ejemplo.com
 # Sólo el "fit_markdown", filtrado por relevancia a una consulta
 crawl4rs crawl https://ejemplo.com --fit --query "rust async runtime"
 
+# Crawl profundo: sigue enlaces del mismo dominio (BFS por defecto)
+crawl4rs deep https://ejemplo.com --max-depth 2 --max-pages 25
+crawl4rs deep https://ejemplo.com --strategy dfs --cross-domain --json
+
 # Procesar un HTML local sin lanzar navegador
 crawl4rs crawl https://ejemplo.com --html-file pagina.html
 

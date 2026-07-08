@@ -20,6 +20,7 @@
 pub mod browser;
 pub mod config;
 pub mod crawler;
+pub mod deep;
 pub mod error;
 pub mod fetch;
 pub mod result;
@@ -30,6 +31,7 @@ pub use browser::{
 };
 pub use config::{CrawlConfig, DeepStrategy};
 pub use crawler::Crawler;
+pub use deep::DeepReport;
 pub use error::{Error, Result};
 #[cfg(not(feature = "browser"))]
 pub use fetch::BrowserFetcher;
