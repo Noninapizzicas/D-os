@@ -41,6 +41,12 @@ enum Command {
         /// Puerto de escucha.
         #[arg(long, default_value_t = 8080)]
         port: u16,
+        /// Dirección de escucha.
+        #[arg(long, default_value = "0.0.0.0")]
+        host: String,
+        /// Activa el modo stealth en los crawls del servidor.
+        #[arg(long)]
+        stealth: bool,
     },
     /// Muestra la configuración por defecto en JSON.
     Config,
@@ -131,10 +137,11 @@ async fn main() -> Result<()> {
     match cli.command {
         Command::Crawl(args) => run_crawl(args).await,
         Command::Deep(args) => run_deep(args).await,
-        Command::Serve { port } => {
-            eprintln!("`serve` (API axum en :{port}) llega en la Fase 6 de la hoja de ruta.");
-            std::process::exit(2);
-        }
+        Command::Serve {
+            port,
+            host,
+            stealth,
+        } => run_serve(host, port, stealth).await,
         Command::Config => {
             let json = serde_json::to_string_pretty(&CrawlConfig::default())?;
             println!("{json}");
@@ -180,6 +187,34 @@ where
         fetcher.shutdown().await;
     }
     out
+}
+
+async fn run_serve(host: String, port: u16, stealth: bool) -> Result<()> {
+    use crawl4rs_server::AuthConfig;
+    use std::net::SocketAddr;
+
+    let secret = std::env::var("CRAWL4RS_JWT_SECRET")
+        .unwrap_or_else(|_| "crawl4rs-dev-secret-cambia-esto".to_string());
+    let mut auth = AuthConfig::new(secret);
+    if let Ok(key) = std::env::var("CRAWL4RS_API_KEY") {
+        auth = auth.with_api_key(key);
+        eprintln!("Emisión de tokens protegida por CRAWL4RS_API_KEY.");
+    } else {
+        eprintln!("AVISO: emisión de tokens abierta (define CRAWL4RS_API_KEY para restringirla).");
+    }
+
+    let mut fetcher = BrowserFetcher::new();
+    if stealth {
+        fetcher = fetcher.with_stealth(Arc::new(StealthEngine::new(StealthConfig::default())));
+    }
+    let crawler = Crawler::new(Arc::new(fetcher));
+
+    let addr: SocketAddr = format!("{host}:{port}")
+        .parse()
+        .map_err(|e| anyhow::anyhow!("dirección inválida {host}:{port}: {e}"))?;
+    eprintln!("Servidor en http://{addr}  ·  dashboard en http://{addr}/dashboard");
+    crawl4rs_server::serve(addr, crawler, auth).await?;
+    Ok(())
 }
 
 async fn run_crawl(args: CrawlArgs) -> Result<()> {

@@ -36,6 +36,19 @@ impl DeepReport {
     }
 }
 
+/// Evento de progreso emitido durante un crawl profundo, útil para streaming.
+#[derive(Debug, Clone)]
+pub struct DeepProgress {
+    /// URL que se acaba de procesar.
+    pub url: String,
+    /// `true` si se procesó con éxito; `false` si hubo error.
+    pub ok: bool,
+    /// Profundidad a la que estaba la URL.
+    pub depth: usize,
+    /// Total de páginas completadas hasta ahora (éxitos).
+    pub completed: usize,
+}
+
 /// Normaliza una URL para deduplicar: descarta el fragmento (`#...`).
 fn normalize(mut url: Url) -> String {
     url.set_fragment(None);
@@ -44,8 +57,22 @@ fn normalize(mut url: Url) -> String {
 
 impl Crawler {
     /// Recorre en profundidad a partir de `seed`, siguiendo enlaces.
-    #[instrument(skip(self, config), fields(seed = %seed))]
     pub async fn crawl_deep(&self, seed: &str, config: &CrawlConfig) -> Result<DeepReport> {
+        self.crawl_deep_with(seed, config, |_| {}).await
+    }
+
+    /// Como [`Crawler::crawl_deep`], pero invoca `on_progress` tras cada página
+    /// procesada — base del streaming en tiempo real del servidor.
+    #[instrument(skip(self, config, on_progress), fields(seed = %seed))]
+    pub async fn crawl_deep_with<F>(
+        &self,
+        seed: &str,
+        config: &CrawlConfig,
+        mut on_progress: F,
+    ) -> Result<DeepReport>
+    where
+        F: FnMut(DeepProgress),
+    {
         let seed_url = Url::parse(seed).map_err(|_| Error::InvalidUrl(seed.to_string()))?;
         let seed_host = seed_url.host_str().map(str::to_owned);
 
@@ -98,9 +125,21 @@ impl Crawler {
                             );
                         }
                         report.pages.push(result);
+                        on_progress(DeepProgress {
+                            url,
+                            ok: true,
+                            depth,
+                            completed: report.pages.len(),
+                        });
                     }
                     Err(e) => {
                         warn!(url = %url, error = %e, "página omitida en crawl profundo");
+                        on_progress(DeepProgress {
+                            url: url.clone(),
+                            ok: false,
+                            depth,
+                            completed: report.pages.len(),
+                        });
                         report.errors.push((url, e.to_string()));
                     }
                 }

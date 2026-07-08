@@ -36,7 +36,7 @@ pub use browser::{
 pub use cache::ResultCache;
 pub use config::{CrawlConfig, DeepStrategy};
 pub use crawler::Crawler;
-pub use deep::DeepReport;
+pub use deep::{DeepProgress, DeepReport};
 pub use error::{Error, Result};
 #[cfg(not(feature = "browser"))]
 pub use fetch::BrowserFetcher;

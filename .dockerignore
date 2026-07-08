@@ -1,0 +1,7 @@
+/target
+/.git
+/.github
+**/*.md
+/.crawl4rs-cache
+*.sled
+.env

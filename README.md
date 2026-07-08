@@ -31,10 +31,12 @@ funciona hoy, compilando y con tests en verde:
 - 🥷 **Modo stealth**: rotación de fingerprint, script anti-detección
   (`navigator.webdriver`, WebGL, plugins…) y comportamiento humano, aplicado
   vía CDP. Flag `--stealth`.
+- 🌐 **Servidor API** (`axum`): REST + WebSocket de progreso, autenticación
+  JWT y dashboard web embebido.
 - 🖥️ **CLI** `crawl4rs` con los subcomandos `crawl`, `deep`, `serve`, `config`.
 
-Marcadores de posición documentados para las fases siguientes: API (`axum`)
-con dashboard y extracción con LLM local (`candle`).
+Queda pendiente la extracción con LLM local (`candle`) y la documentación
+completa (mdBook).
 
 ## Instalación y uso
 
@@ -71,6 +73,37 @@ crawl4rs config
 > Se necesita un Chromium/Chrome instalado. Se busca automáticamente en rutas
 > conocidas; puede fijarse con `CRAWL4RS_CHROME=/ruta/al/chromium`. Los builds
 > sin navegador son posibles con `--no-default-features` en `crawl4rs-core`.
+
+### Servidor API
+
+```bash
+# Lanza el servidor (dashboard en /dashboard). Restringe la emisión de
+# tokens con CRAWL4RS_API_KEY y firma los JWT con CRAWL4RS_JWT_SECRET.
+CRAWL4RS_API_KEY=mi-clave crawl4rs serve --port 8080
+
+# 1) Obtener un token
+TOKEN=$(curl -s -XPOST localhost:8080/auth/token -H "x-api-key: mi-clave" | jq -r .token)
+# 2) Lanzar un crawl
+ID=$(curl -s -XPOST localhost:8080/crawl -H "Authorization: Bearer $TOKEN" \
+     -H 'Content-Type: application/json' \
+     -d '{"url":"https://ejemplo.com","max_depth":1}' | jq -r .id)
+# 3) Consultar el resultado (o suscribirse a WS /crawl/$ID/stream?token=…)
+curl -s localhost:8080/crawl/$ID/result -H "Authorization: Bearer $TOKEN"
+```
+
+Endpoints: `POST /auth/token`, `POST /crawl`, `GET /crawl/{id}/status`,
+`GET /crawl/{id}/result`, `GET /crawl/{id}/stream` (WebSocket), `GET /dashboard`,
+`GET /health`.
+
+### Docker
+
+```bash
+docker build -t crawl4rs .
+docker run -p 8080:8080 -e CRAWL4RS_JWT_SECRET=… crawl4rs
+```
+
+La imagen (`distroless/cc`) empaqueta sólo el binario; para el modo navegador
+aporta un Chromium accesible y apunta `CRAWL4RS_CHROME` a él.
 
 ### Como biblioteca
 

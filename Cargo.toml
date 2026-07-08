@@ -56,6 +56,13 @@ clap = { version = "4", features = ["derive"] }
 # Caché persistente en disco
 sled = "0.34"
 
+# Servidor HTTP / API
+axum = { version = "0.8", features = ["ws"] }
+tower = "0.5"
+tower-http = { version = "0.7", features = ["trace", "cors"] }
+jsonwebtoken = { version = "10", default-features = false, features = ["rust_crypto", "use_pem"] }
+uuid = { version = "1", features = ["v4"] }
+
 [profile.release]
 # Objetivo de la visión: binario estático pequeño (< 20 MB en imagen Docker).
 opt-level = "z"

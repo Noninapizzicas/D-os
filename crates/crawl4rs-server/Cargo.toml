@@ -5,10 +5,22 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "API HTTP/WebSocket de Crawl4RS (axum). DTOs disponibles; servidor en la Fase 6."
+description = "API HTTP/WebSocket y dashboard de Crawl4RS (axum), con autenticación JWT."
 authors.workspace = true
 
 [dependencies]
 crawl4rs-core = { workspace = true }
+axum = { workspace = true }
+tower-http = { workspace = true }
+jsonwebtoken = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tracing = { workspace = true }
+futures = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true, features = ["util"] }
+http-body-util = "0.1"
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
