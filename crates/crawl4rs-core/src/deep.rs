@@ -208,6 +208,7 @@ mod tests {
                     url: url.to_string(),
                     status: Some(200),
                     html: html.clone(),
+                    ..Default::default()
                 }),
                 None => Err(Error::fetch(
                     url,

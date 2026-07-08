@@ -59,11 +59,43 @@ impl Fetcher for HttpFetcher {
             .map_err(|e| Error::fetch(url, e))?;
         let status = resp.status().as_u16();
         let final_url = resp.url().to_string();
-        let html = resp.text().await.map_err(|e| Error::fetch(url, e))?;
-        Ok(FetchedPage {
-            url: final_url,
-            status: Some(status),
-            html,
-        })
+        let content_type = resp
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
+        // El contenido binario (PDF) se devuelve como bytes; el texto, como
+        // `html`. La detección de PDF vive en `FetchedPage::is_pdf`.
+        let is_pdf = content_type
+            .as_deref()
+            .map(|c| c.to_ascii_lowercase().contains("application/pdf"))
+            .unwrap_or(false)
+            || final_url
+                .split(['?', '#'])
+                .next()
+                .unwrap_or("")
+                .to_ascii_lowercase()
+                .ends_with(".pdf");
+
+        if is_pdf {
+            let bytes = resp.bytes().await.map_err(|e| Error::fetch(url, e))?;
+            Ok(FetchedPage {
+                url: final_url,
+                status: Some(status),
+                html: String::new(),
+                content_type,
+                bytes: Some(bytes.to_vec()),
+            })
+        } else {
+            let html = resp.text().await.map_err(|e| Error::fetch(url, e))?;
+            Ok(FetchedPage {
+                url: final_url,
+                status: Some(status),
+                html,
+                content_type,
+                bytes: None,
+            })
+        }
     }
 }

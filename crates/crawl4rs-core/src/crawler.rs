@@ -130,6 +130,24 @@ impl Crawler {
         let page = self.fetch_by_mode(url, config.mode).await?;
         debug!(status = ?page.status, bytes = page.html.len(), "página descargada");
 
+        // PDF digital: texto → markdown, saltándose el pipeline HTML.
+        #[cfg(feature = "pdf")]
+        if page.is_pdf() {
+            if let Some(bytes) = &page.bytes {
+                let md = crate::pdf::pdf_to_markdown(bytes)?;
+                return Ok(CrawlResult {
+                    url: page.url,
+                    status: page.status,
+                    html: String::new(),
+                    markdown: md.clone(),
+                    fit_markdown: md,
+                    extracted: None,
+                    jsonld: Vec::new(),
+                    links: Vec::new(),
+                });
+            }
+        }
+
         let opts = PipelineOptions {
             query: config.query.clone(),
             word_count_threshold: config.word_count_threshold,
