@@ -50,6 +50,13 @@ pub struct CrawlConfig {
     /// Estrategia de recorrido para crawl profundo.
     pub deep_strategy: DeepStrategy,
 
+    /// En crawl profundo, restringir el recorrido al mismo dominio que la
+    /// URL semilla. Si es `false`, se siguen también enlaces externos.
+    pub same_domain: bool,
+
+    /// Número de descargas simultáneas (crawl profundo y `crawl_many`).
+    pub concurrency: usize,
+
     /// Tiempo máximo de espera por página, en milisegundos.
     pub timeout_ms: u64,
 
@@ -66,6 +73,8 @@ impl Default for CrawlConfig {
             max_pages: 100,
             max_depth: 2,
             deep_strategy: DeepStrategy::default(),
+            same_domain: true,
+            concurrency: 4,
             timeout_ms: 30_000,
             stealth: false,
         }

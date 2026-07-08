@@ -16,6 +16,7 @@ use std::time::Duration;
 
 use crawl4rs_core::{
     BrowserFetcher, BrowserPool, BrowserPoolConfig, CrawlConfig, Crawler, SessionManager,
+    StealthConfig, StealthEngine,
 };
 
 /// Sirve un HTML fijo por HTTP en un puerto libre y devuelve su URL.
@@ -137,4 +138,37 @@ async fn session_manager_persiste_cookies_y_localstorage() {
     pool_b.close().await;
 
     let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test]
+#[ignore = "lanza un Chromium real; ejecutar con --ignored"]
+async fn stealth_oculta_webdriver_y_expone_el_estado_en_la_pagina() {
+    // La página escribe en su cuerpo el valor de navigator.webdriver y el UA,
+    // de modo que aparezcan en el HTML/Markdown que devuelve el crawler.
+    let url = serve(
+        "<script>document.documentElement.innerHTML = \
+         '<body><article><h1>wd:' + navigator.webdriver + '</h1>' + \
+         '<p>ua:' + navigator.userAgent + '</p></article></body>';</script>",
+    );
+
+    let engine = Arc::new(StealthEngine::new(StealthConfig::default()));
+    let fetcher = BrowserFetcher::new()
+        .with_timeout(Duration::from_secs(20))
+        .with_stealth(engine);
+    let crawler = Crawler::new(Arc::new(fetcher));
+
+    let config = CrawlConfig {
+        word_count_threshold: 1,
+        ..Default::default()
+    };
+    let result = crawler.crawl(&url, &config).await.expect("crawl stealth");
+
+    // navigator.webdriver debe quedar como `undefined`, no `true`.
+    assert!(
+        result.html.contains("wd:undefined"),
+        "html: {}",
+        result.html
+    );
+    // El UA rotado (Chrome) debe reflejarse.
+    assert!(result.html.contains("Chrome/"), "html: {}", result.html);
 }

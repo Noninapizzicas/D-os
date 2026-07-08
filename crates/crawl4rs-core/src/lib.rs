@@ -18,18 +18,25 @@
 
 #[cfg(feature = "browser")]
 pub mod browser;
+#[cfg(feature = "cache")]
+pub mod cache;
 pub mod config;
 pub mod crawler;
+pub mod deep;
 pub mod error;
 pub mod fetch;
 pub mod result;
 
 #[cfg(feature = "browser")]
 pub use browser::{
-    detect_chrome_executable, BrowserFetcher, BrowserPool, BrowserPoolConfig, SessionManager,
+    detect_chrome_executable, BrowserFetcher, BrowserPool, BrowserPoolConfig, Fingerprint,
+    SessionManager, StealthConfig, StealthEngine,
 };
+#[cfg(feature = "cache")]
+pub use cache::ResultCache;
 pub use config::{CrawlConfig, DeepStrategy};
 pub use crawler::Crawler;
+pub use deep::DeepReport;
 pub use error::{Error, Result};
 #[cfg(not(feature = "browser"))]
 pub use fetch::BrowserFetcher;

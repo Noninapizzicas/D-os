@@ -31,23 +31,41 @@ repositorio.
 - [x] `Bm25Filter`: ranking por relevancia (Okapi BM25 propio).
 - [ ] Comparativa de salida contra Crawl4AI.
 
-## Fase 3 — Extracción estructurada · 🟡 en curso
+## Fase 3 — Extracción estructurada y crawl profundo · 🟡 en curso
 - [x] `CssSelectorStrategy`.
 - [x] `SemanticDensityStrategy`.
+- [x] `deep` (crawl BFS/DFS): recorrido con `Crawler::crawl_deep`, respeta
+      `max_pages`/`max_depth`/estrategia/`same_domain`, resuelve enlaces
+      relativos, deduplica y aísla el dominio. Subcomando `crawl4rs deep`.
 - [ ] Integrar `readability` (artículo principal).
 - [ ] `LlmExtractionStrategy` con `candle` (ONNX local).
-- [ ] `deep` (crawl BFS/DFS).
 
-## Fase 4 — Caché y optimización
+## Fase 4 — Caché y optimización · 🟡 en curso
 - [x] `MemoryCache` (LRU en RAM).
-- [ ] `DiskCache` con `sled`.
-- [ ] `PredictiveCache` por hash de DOM.
-- [ ] Concurrencia masiva con `tokio`; TTL adaptativo por `Cache-Control`.
+- [x] `DiskCache` con `sled` (valores JSON, persistente entre ejecuciones).
+- [x] `TieredCache`: RAM por delante de disco, con promoción.
+- [x] `ResultCache` integrada en `Crawler` (feature `cache`): las páginas ya
+      vistas no se descargan ni reprocesan. Medido: crawl profundo de 4
+      páginas ~0,73 s en frío → ~0,06 s en caliente (>10×; ni siquiera se
+      lanza Chromium).
+- [x] Concurrencia acotada: `crawl_many` y `crawl_deep` descargan en paralelo
+      (`config.concurrency`), recorrido por oleadas.
+- [x] `dom_signature` (en `crawl4rs-markdown`): firma estructural del DOM,
+      base de la caché predictiva por plantilla.
+- [ ] `PredictiveCache`: reutilizar lógica de extracción entre URLs con la
+      misma firma de DOM.
+- [ ] TTL adaptativo por cabeceras `Cache-Control`.
 
-## Fase 5 — Stealth y anti-detección
+## Fase 5 — Stealth y anti-detección · 🟡 en curso
 - [x] Catálogo de fingerprints y `StealthConfig`.
-- [ ] Integrar `chaser-oxide` (CDP endurecido).
-- [ ] Rotación de fingerprint y emulación de comportamiento humano.
+- [x] `StealthEngine`: rotación round-robin de fingerprint, script de
+      ocultación (neutraliza `navigator.webdriver`, `languages`, `platform`,
+      `plugins`, vendor de WebGL, `window.chrome`) y retardos "humanos"
+      deterministas (xorshift).
+- [x] Aplicación vía CDP en `BrowserPool`: UA/idioma/viewport por página,
+      `addScriptToEvaluateOnNewDocument` antes de navegar, movimiento de ratón
+      y pausas. Flag `--stealth` en la CLI.
+- [ ] CDP endurecido a la manera de `chaser-oxide` (patch de más señales CDP).
 - [ ] Proxies rotativos.
 
 ## Fase 6 — API, CLI y dashboard

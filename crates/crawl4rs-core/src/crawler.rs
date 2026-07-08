@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use futures::stream::{self, StreamExt};
 use tracing::{debug, instrument};
 
 use crawl4rs_markdown::{MarkdownPipeline, PipelineOptions};
@@ -19,6 +20,8 @@ use crate::result::CrawlResult;
 pub struct Crawler {
     fetcher: Arc<dyn Fetcher>,
     pipeline: MarkdownPipeline,
+    #[cfg(feature = "cache")]
+    cache: Option<crate::cache::ResultCache>,
 }
 
 impl Crawler {
@@ -27,12 +30,42 @@ impl Crawler {
         Self {
             fetcher,
             pipeline: MarkdownPipeline::new(),
+            #[cfg(feature = "cache")]
+            cache: None,
         }
     }
 
+    /// Asocia una caché de resultados; las páginas ya vistas no se vuelven a
+    /// descargar ni a procesar.
+    #[cfg(feature = "cache")]
+    pub fn with_cache(mut self, cache: crate::cache::ResultCache) -> Self {
+        self.cache = Some(cache);
+        self
+    }
+
     /// Descarga y procesa una única URL.
-    #[instrument(skip(self), fields(url = %url))]
+    #[instrument(skip(self, config), fields(url = %url))]
     pub async fn crawl(&self, url: &str, config: &CrawlConfig) -> Result<CrawlResult> {
+        #[cfg(feature = "cache")]
+        if let Some(cache) = &self.cache {
+            if let Some(hit) = cache.get(url) {
+                debug!("acierto de caché");
+                return Ok(hit);
+            }
+        }
+
+        let result = self.crawl_uncached(url, config).await?;
+
+        #[cfg(feature = "cache")]
+        if let Some(cache) = &self.cache {
+            cache.put(url, &result);
+        }
+
+        Ok(result)
+    }
+
+    /// Descarga y procesa una URL sin consultar ni escribir la caché.
+    async fn crawl_uncached(&self, url: &str, config: &CrawlConfig) -> Result<CrawlResult> {
         let page = self.fetcher.fetch(url).await?;
         debug!(status = ?page.status, bytes = page.html.len(), "página descargada");
 
@@ -57,19 +90,20 @@ impl Crawler {
         })
     }
 
-    /// Descarga y procesa varias URLs de forma secuencial.
+    /// Descarga y procesa varias URLs con concurrencia acotada.
     ///
-    /// La concurrencia masiva (con `tokio`) llega en la Fase 4; esta versión
-    /// mantiene la semántica simple y determinista para los tests.
+    /// El número de descargas simultáneas es `config.concurrency` (mínimo 1);
+    /// el orden de salida se corresponde con el de entrada.
     pub async fn crawl_many(
         &self,
         urls: &[String],
         config: &CrawlConfig,
     ) -> Vec<Result<CrawlResult>> {
-        let mut out = Vec::with_capacity(urls.len());
-        for url in urls {
-            out.push(self.crawl(url, config).await);
-        }
-        out
+        let concurrency = config.concurrency.max(1);
+        stream::iter(urls.iter())
+            .map(|url| async move { self.crawl(url, config).await })
+            .buffered(concurrency)
+            .collect()
+            .await
     }
 }

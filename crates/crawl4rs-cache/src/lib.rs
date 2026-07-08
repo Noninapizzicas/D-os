@@ -2,9 +2,19 @@
 //!
 //! Capa de caché para evitar reprocesar páginas.
 //!
-//! - [`MemoryCache`]: LRU en RAM, acceso ultrarrápido (disponible).
-//! - [`Cache`]: trait común para futuros backends (disco con `sled`,
-//!   caché predictiva por hash de DOM) — Fase 4 de la hoja de ruta.
+//! - [`MemoryCache`]: LRU en RAM, acceso ultrarrápido.
+//! - [`DiskCache`]: persistente con `sled`, valores serializados a JSON.
+//! - [`TieredCache`]: RAM por delante de disco, con promoción.
+//!
+//! La caché predictiva por plantilla se apoya en la firma de DOM que expone
+//! `crawl4rs-markdown` (`dom_signature`): dos páginas con la misma estructura
+//! comparten clave.
+
+mod disk;
+mod tiered;
+
+pub use disk::{CacheError, DiskCache};
+pub use tiered::TieredCache;
 
 use std::hash::Hash;
 use std::num::NonZeroUsize;

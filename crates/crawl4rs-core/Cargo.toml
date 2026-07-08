@@ -9,21 +9,27 @@ description = "Núcleo de Crawl4RS: orquestación del crawl (fetch → limpieza 
 authors.workspace = true
 
 [features]
-default = ["browser"]
-# Fetcher real vía Chromium/CDP. Desactivable para builds ligeros sin navegador.
-browser = ["dep:chromiumoxide", "dep:futures", "dep:tokio"]
+default = ["browser", "cache"]
+# Fetcher real vía Chromium/CDP, con modo stealth. Desactivable para builds
+# ligeros sin navegador.
+browser = ["dep:chromiumoxide", "dep:tokio", "dep:crawl4rs-stealth"]
+# Caché de resultados (RAM + disco con sled).
+cache = ["dep:crawl4rs-cache"]
 
 [dependencies]
 crawl4rs-markdown.workspace = true
+crawl4rs-cache = { workspace = true, optional = true }
+crawl4rs-stealth = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 async-trait = { workspace = true }
 url = { workspace = true }
+futures = { workspace = true }
 chromiumoxide = { workspace = true, optional = true }
-futures = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["rt", "time", "sync"], optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+tempfile = "3"

@@ -17,7 +17,9 @@ pub mod cleaner;
 pub mod converter;
 pub mod filter;
 pub mod pipeline;
+pub mod signature;
 
 pub use converter::{html_to_markdown, Converted};
 pub use filter::{Bm25Filter, ContentFilter, PruningFilter};
 pub use pipeline::{MarkdownPipeline, PipelineError, PipelineOptions, PipelineOutput};
+pub use signature::dom_signature;
