@@ -319,14 +319,52 @@ async fn run_serve(host: String, port: u16, stealth: bool) -> Result<()> {
     use crawl4rs_server::AuthConfig;
     use std::net::SocketAddr;
 
+    // LA LEY DE LA FRONTERA: la auth protege una frontera, no un ritual.
+    //   · secreto explícito              → auth ACTIVA (decisión del operador).
+    //   · CRAWL4RS_AUTH=abierta          → auth ABIERTA declarada (la frontera vive en otra
+    //     capa: p.ej. Docker publicando solo a 127.0.0.1 del host — el contenedor bindea
+    //     0.0.0.0 por necesidad del port-mapping y no puede ver la frontera real).
+    //   · loopback sin secreto           → auth ABIERTA (no hay frontera que proteger).
+    //   · público sin secreto            → NEGARSE A ARRANCAR (fail-closed: jamás el
+    //     default forjable de antes, jamás un secreto generado en silencio).
+    let es_loopback = matches!(host.as_str(), "127.0.0.1" | "::1" | "localhost");
+    let abierta_declarada = std::env::var("CRAWL4RS_AUTH")
+        .map(|v| v.trim().eq_ignore_ascii_case("abierta"))
+        .unwrap_or(false);
     let secret = std::env::var("CRAWL4RS_JWT_SECRET")
-        .unwrap_or_else(|_| "crawl4rs-dev-secret-cambia-esto".to_string());
-    let mut auth = AuthConfig::new(secret);
-    if let Ok(key) = std::env::var("CRAWL4RS_API_KEY") {
-        auth = auth.with_api_key(key);
-        eprintln!("Emisión de tokens protegida por CRAWL4RS_API_KEY.");
-    } else {
-        eprintln!("AVISO: emisión de tokens abierta (define CRAWL4RS_API_KEY para restringirla).");
+        .ok()
+        .filter(|s| !s.trim().is_empty());
+    let mut auth = match (secret, abierta_declarada, es_loopback) {
+        (Some(secret), _, _) => {
+            eprintln!("Auth JWT activa (CRAWL4RS_JWT_SECRET explícito).");
+            AuthConfig::new(secret)
+        }
+        (None, true, _) => {
+            eprintln!(
+                "Auth ABIERTA declarada (CRAWL4RS_AUTH=abierta): la frontera vive en otra capa."
+            );
+            AuthConfig::abierta()
+        }
+        (None, false, true) => {
+            eprintln!("Loopback sin secreto → auth ABIERTA (no hay frontera que proteger).");
+            AuthConfig::abierta()
+        }
+        (None, false, false) => anyhow::bail!(
+            "bindear a {host} expone el servidor más allá de loopback: define CRAWL4RS_JWT_SECRET \
+             (o declara CRAWL4RS_AUTH=abierta si la frontera vive en otra capa)"
+        ),
+    };
+    // API key PRESENTE pero vacía = NO configurada (una variable vacía blindaba
+    // /auth/token con clave "" — cazado en producción).
+    match std::env::var("CRAWL4RS_API_KEY")
+        .ok()
+        .filter(|k| !k.trim().is_empty())
+    {
+        Some(key) => {
+            auth = auth.with_api_key(key);
+            eprintln!("Emisión de tokens protegida por CRAWL4RS_API_KEY.");
+        }
+        None => eprintln!("Emisión de tokens abierta (define CRAWL4RS_API_KEY para restringirla)."),
     }
 
     let mut fetcher = BrowserFetcher::new();

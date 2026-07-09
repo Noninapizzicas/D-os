@@ -98,11 +98,14 @@ repositorio.
       navegador funciona de fábrica) y target `minimal` distroless sin
       navegador. Builder fijado a bookworm para alinear glibc con el runtime.
 - [x] Workflow de releases (`release.yml`): binarios Linux/macOS por tag.
-- [ ] Endurecer el secreto JWT (safe-by-default): sin `CRAWL4RS_JWT_SECRET`,
-      generar uno ALEATORIO en el arranque y avisarlo por log — nunca el default
-      conocido `crawl4rs-dev-secret-cambia-esto` (hoy forjable por cualquiera).
-      Además, NEGARSE a arrancar (fail-closed) si el servidor bindea a interfaz
-      pública (0.0.0.0) sin un secreto explícito. No bloquea el desarrollo local.
+- [x] LA LEY DE LA FRONTERA (endurecimiento del secreto, resuelto de raíz): la auth
+      protege una frontera, no un ritual. Secreto explícito → activa · `CRAWL4RS_AUTH=abierta`
+      → abierta declarada (la frontera vive en otra capa, p.ej. Docker publicando solo a
+      127.0.0.1 del host) · loopback sin secreto → abierta (no hay frontera) · público sin
+      secreto → se NIEGA a arrancar (fail-closed). El default forjable murió (Dockerfile
+      incluido) y `CRAWL4RS_API_KEY` presente-pero-vacía ya no cuenta como configurada
+      (bug cazado en producción). `/auth/token` sigue emitiendo en modo abierta
+      (compatibilidad con clientes que hacen el baile del token).
 - [ ] Documentación completa (mdBook).
 
 ## Fase 7 — Transporte MQTT nativo (órgano de bus) · 🔜 siguiente
