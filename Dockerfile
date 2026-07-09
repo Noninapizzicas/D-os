@@ -31,8 +31,12 @@ RUN apt-get update \
 RUN useradd --create-home --uid 10001 crawl4rs
 COPY --from=builder /build/target/release/crawl4rs /usr/local/bin/crawl4rs
 
-ENV CRAWL4RS_CHROME=/usr/bin/chromium \
-    CRAWL4RS_JWT_SECRET=cambia-esto-en-produccion
+# Sin secreto default (era forjable). LA LEY DE LA FRONTERA al arrancar `serve`:
+# el contenedor bindea 0.0.0.0 (necesidad del port-mapping) → hay que decidir:
+#   -e CRAWL4RS_JWT_SECRET=…   → auth activa, o
+#   -e CRAWL4RS_AUTH=abierta   → la frontera vive en otra capa (p.ej. publicas solo a 127.0.0.1)
+# Sin ninguna de las dos, el servidor se NIEGA a arrancar (fail-closed).
+ENV CRAWL4RS_CHROME=/usr/bin/chromium
 USER crawl4rs
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/crawl4rs"]
@@ -45,7 +49,6 @@ CMD ["serve", "--host", "0.0.0.0", "--port", "8080"]
 # ============================================================================
 FROM gcr.io/distroless/cc-debian12 AS minimal
 COPY --from=builder /build/target/release/crawl4rs /usr/local/bin/crawl4rs
-ENV CRAWL4RS_JWT_SECRET=cambia-esto-en-produccion
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/crawl4rs"]
 CMD ["serve", "--host", "0.0.0.0", "--port", "8080"]

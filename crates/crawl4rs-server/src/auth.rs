@@ -29,16 +29,35 @@ pub struct AuthConfig {
     api_key: Option<Arc<String>>,
     /// Validez de los tokens emitidos, en segundos.
     ttl_secs: u64,
+    /// `false` → auth ABIERTA: el middleware deja pasar sin token. La auth
+    /// protege una FRONTERA; cuando no la hay (loopback) o está en otra capa
+    /// (Docker publicando solo a 127.0.0.1 del host), exigir token es teatro.
+    exigir: bool,
 }
 
 impl AuthConfig {
-    /// Crea la configuración con un secreto de firma.
+    /// Crea la configuración con un secreto de firma (auth activa).
     pub fn new(secret: impl Into<String>) -> Self {
         Self {
             secret: Arc::new(secret.into()),
             api_key: None,
             ttl_secs: 3600,
+            exigir: true,
         }
+    }
+
+    /// Auth ABIERTA: `/auth/token` sigue emitiendo (compatibilidad con clientes
+    /// que hacen el baile del token) pero las rutas protegidas no lo exigen.
+    /// El secreto efímero solo firma esos tokens de cortesía.
+    pub fn abierta() -> Self {
+        let mut cfg = Self::new(uuid::Uuid::new_v4().to_string());
+        cfg.exigir = false;
+        cfg
+    }
+
+    /// ¿El middleware exige token?
+    pub fn exige(&self) -> bool {
+        self.exigir
     }
 
     /// Exige una API key concreta para emitir tokens.
@@ -95,6 +114,9 @@ pub async fn require_jwt(
     request: Request<axum::body::Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
+    if !state.auth.exige() {
+        return Ok(next.run(request).await);
+    }
     let header = request
         .headers()
         .get(axum::http::header::AUTHORIZATION)
@@ -109,4 +131,32 @@ pub async fn require_jwt(
         return Err(StatusCode::UNAUTHORIZED);
     }
     Ok(next.run(request).await)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn auth_activa_exige_y_verifica_roundtrip() {
+        let auth = AuthConfig::new("secreto-de-test");
+        assert!(auth.exige());
+        let token = auth.issue("cliente").expect("emite");
+        assert_eq!(auth.verify(&token).expect("verifica").sub, "cliente");
+    }
+
+    #[test]
+    fn auth_abierta_no_exige_pero_sigue_emitiendo() {
+        // Compatibilidad: los clientes que hacen el baile del token no se rompen.
+        let auth = AuthConfig::abierta();
+        assert!(!auth.exige());
+        let token = auth.issue("cliente").expect("emite tokens de cortesía");
+        assert!(auth.verify(&token).is_ok());
+    }
+
+    #[test]
+    fn api_key_ok_sin_configurar_es_abierta() {
+        let auth = AuthConfig::abierta();
+        assert!(auth.api_key_ok(None));
+    }
 }
