@@ -9,7 +9,7 @@ description = "Núcleo de Crawl4RS: orquestación del crawl (fetch → limpieza 
 authors.workspace = true
 
 [features]
-default = ["browser", "cache", "extract", "http", "pdf"]
+default = ["browser", "cache", "extract", "http", "pdf", "playwright"]
 # Fetcher real vía Chromium/CDP, con modo stealth. Desactivable para builds
 # ligeros sin navegador.
 browser = ["dep:chromiumoxide", "dep:tokio", "dep:crawl4rs-stealth"]

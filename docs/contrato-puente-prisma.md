@@ -170,7 +170,12 @@ capa de agente** — cada transporte en su registro, sobre el mismo Playwright.
 - **MFA/OTP** (fuente externa).
 
 ### Veredicto de madurez
-**Propuesta lista para decidir.** El subconjunto `ahora` — `abrir(url)→{html}`
-y `extraer(html)→{markdown}` — es implementable de inmediato y cierra la
-capacidad de extracción de punta a punta en su forma mínima. Todo lo demás
-queda **reservado**: declarado en el contrato, para rellenar sin rediseñar.
+**Subconjunto `ahora` CONSTRUIDO Y CABLEADO.** `abrir(url)→{html}` funciona de
+punta a punta: `PlaywrightFetcher` (Rust, feature `playwright`) + wrapper HTTP
+(`bridge/playwright-wrapper/`). Cableado en la escalación: si
+`CRAWL4RS_PLAYWRIGHT_URL` está definida, la **marcha larga** del `auto` de
+Crawl4RS pasa a ser Playwright; si no, el navegador propio (additivo, honesto).
+Verificado en vivo: `crawl --mode browser` sobre el wrapper con Chromium real
+→ Markdown. Todo lo demás del contrato queda **reservado**: declarado, para
+rellenar sin rediseñar. Falta la verificación contra la web pública real
+(egress fuera del sandbox).

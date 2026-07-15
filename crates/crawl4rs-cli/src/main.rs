@@ -297,7 +297,10 @@ where
         HttpFetcher::new()
     };
 
-    let mut crawler = Crawler::new(browser.clone()).with_browser_fetcher(browser.clone());
+    // La marcha larga es Playwright si está configurado; si no, el navegador propio.
+    let long_gear: Arc<dyn crawl4rs_core::Fetcher> =
+        playwright_gear().unwrap_or_else(|| browser.clone() as Arc<dyn crawl4rs_core::Fetcher>);
+    let mut crawler = Crawler::new(browser.clone()).with_browser_fetcher(long_gear);
     if let Ok(http) = http {
         crawler = crawler.with_http_fetcher(Arc::new(http));
     }
@@ -313,6 +316,29 @@ where
         browser.shutdown().await;
     }
     out
+}
+
+/// Marcha larga por Playwright, si `CRAWL4RS_PLAYWRIGHT_URL` está definida.
+/// El puente es HTTP fino (el MCP se reserva para la capa de agente). Sin la
+/// variable, se usa el navegador propio (degradación honesta, additivo).
+#[cfg(feature = "playwright")]
+fn playwright_gear() -> Option<Arc<dyn crawl4rs_core::Fetcher>> {
+    let url = std::env::var("CRAWL4RS_PLAYWRIGHT_URL").ok()?;
+    match crawl4rs_core::PlaywrightFetcher::new(&url) {
+        Ok(f) => {
+            eprintln!("Marcha larga: Playwright en {url}");
+            Some(Arc::new(f))
+        }
+        Err(e) => {
+            eprintln!("AVISO: Playwright no disponible ({e}); uso el navegador propio.");
+            None
+        }
+    }
+}
+
+#[cfg(not(feature = "playwright"))]
+fn playwright_gear() -> Option<Arc<dyn crawl4rs_core::Fetcher>> {
+    None
 }
 
 async fn run_serve(host: String, port: u16, stealth: bool) -> Result<()> {
@@ -372,9 +398,12 @@ async fn run_serve(host: String, port: u16, stealth: bool) -> Result<()> {
         fetcher = fetcher.with_stealth(Arc::new(StealthEngine::new(StealthConfig::default())));
     }
     let browser = Arc::new(fetcher);
-    // El servidor sirve todos los modos: HTTP rápido + navegador. `mode` de
-    // cada `POST /crawl` decide cuál se usa (auto por defecto).
-    let mut crawler = Crawler::new(browser.clone()).with_browser_fetcher(browser);
+    // El servidor sirve todos los modos: HTTP rápido + marcha larga. `mode` de
+    // cada `POST /crawl` decide cuál se usa (auto por defecto). La marcha larga
+    // es Playwright si CRAWL4RS_PLAYWRIGHT_URL está definida; si no, el navegador propio.
+    let long_gear: Arc<dyn crawl4rs_core::Fetcher> =
+        playwright_gear().unwrap_or_else(|| browser.clone() as Arc<dyn crawl4rs_core::Fetcher>);
+    let mut crawler = Crawler::new(browser.clone()).with_browser_fetcher(long_gear);
     if let Ok(http) = HttpFetcher::new() {
         crawler = crawler.with_http_fetcher(Arc::new(http));
     }
