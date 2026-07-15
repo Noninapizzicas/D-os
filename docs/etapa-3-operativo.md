@@ -46,8 +46,13 @@ El motor está operativo cuando, con los dos contenedores levantados, puede:
   o URL de login), el crawler hace login, **refresca la celda y reintenta una
   vez** (sin bucles). Test `auto_reloguea_al_perder_sesion_y_reintenta` en verde.
 - **Desbloquea:** volumen autenticado barato y sesiones que caducan sin romperse.
-- **Pendiente:** cablearlo en el CLI/servidor (`--login` receta + wiring), que
-  es trabajo de UX, no de motor.
+- ✅ **Cableado en el CLI/servidor** por variables de entorno (mismo patrón que
+  `CRAWL4RS_PLAYWRIGHT_URL`):
+  - `CRAWL4RS_PLAYWRIGHT_URL` = endpoint del wrapper.
+  - `CRAWL4RS_LOGIN` = ruta a un JSON `{ "url": "…", "pasos": [ {tipo,selector,valor} … ] }`.
+  Con ambas, `crawl`/`deep`/`serve` comparten la celda de sesión entre marchas
+  y activan el lazo. Sin ellas, comportamiento idéntico (additivo). Verificado:
+  el CLI lee la receta y anuncia `Auto-login: receta … vía …`.
 
 ### 3. Interacción para revelar
 - **Wrapper:** `POST /abrir { url, interactuar:[scroll|click|fill_form|wait] }`

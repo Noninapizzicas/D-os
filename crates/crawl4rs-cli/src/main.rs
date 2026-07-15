@@ -297,12 +297,25 @@ where
         HttpFetcher::new()
     };
 
-    // La marcha larga es Playwright si está configurado; si no, el navegador propio.
-    let long_gear: Arc<dyn crawl4rs_core::Fetcher> =
-        playwright_gear().unwrap_or_else(|| browser.clone() as Arc<dyn crawl4rs_core::Fetcher>);
+    // Auto-login (opcional): comparte una celda de sesión entre marchas.
+    let auto = auto_login_setup();
+    // La marcha larga: la de auto-login si hay; si no, Playwright suelto o el
+    // navegador propio.
+    let long_gear: Arc<dyn crawl4rs_core::Fetcher> = match &auto {
+        Some((_, _, pf)) => pf.clone(),
+        None => {
+            playwright_gear().unwrap_or_else(|| browser.clone() as Arc<dyn crawl4rs_core::Fetcher>)
+        }
+    };
     let mut crawler = Crawler::new(browser.clone()).with_browser_fetcher(long_gear);
-    if let Ok(http) = http {
+    if let Ok(mut http) = http {
+        if let Some((cell, _, _)) = &auto {
+            http = http.with_session_cell(cell.clone());
+        }
         crawler = crawler.with_http_fetcher(Arc::new(http));
+    }
+    if let Some((cell, auth, _)) = auto {
+        crawler = crawler.with_auto_login(auth, cell);
     }
     if let Some(cache) = cache.clone() {
         crawler = crawler.with_cache(cache);
@@ -338,6 +351,46 @@ fn playwright_gear() -> Option<Arc<dyn crawl4rs_core::Fetcher>> {
 
 #[cfg(not(feature = "playwright"))]
 fn playwright_gear() -> Option<Arc<dyn crawl4rs_core::Fetcher>> {
+    None
+}
+
+/// Auto-login: celda de sesión compartida + autenticador + marcha larga con
+/// esa celda. Requiere `CRAWL4RS_PLAYWRIGHT_URL` **y** `CRAWL4RS_LOGIN` (ruta a
+/// un JSON `{ "url": "…", "pasos": [ … ] }`). Sin ellas, `None` (additivo).
+type AutoLogin = (
+    crawl4rs_core::session::SessionCell,
+    Arc<dyn crawl4rs_core::session::Authenticator>,
+    Arc<dyn crawl4rs_core::Fetcher>,
+);
+
+#[cfg(feature = "playwright")]
+fn auto_login_setup() -> Option<AutoLogin> {
+    let endpoint = std::env::var("CRAWL4RS_PLAYWRIGHT_URL").ok()?;
+    let recipe_path = std::env::var("CRAWL4RS_LOGIN").ok()?;
+    let contents = std::fs::read_to_string(&recipe_path)
+        .map_err(|e| eprintln!("AVISO: no pude leer CRAWL4RS_LOGIN ({recipe_path}): {e}"))
+        .ok()?;
+    let v: serde_json::Value = serde_json::from_str(&contents)
+        .map_err(|e| eprintln!("AVISO: receta de login inválida: {e}"))
+        .ok()?;
+    let login_url = v.get("url").and_then(|x| x.as_str())?.to_string();
+    let pasos = v
+        .get("pasos")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!([]));
+
+    let cell = crawl4rs_core::session::empty_session_cell();
+    let pf = crawl4rs_core::PlaywrightFetcher::new(&endpoint)
+        .ok()?
+        .with_session_cell(cell.clone());
+    let auth: Arc<dyn crawl4rs_core::session::Authenticator> =
+        Arc::new(pf.authenticator(login_url, pasos));
+    eprintln!("Auto-login: receta {recipe_path} vía {endpoint}");
+    Some((cell, auth, Arc::new(pf) as Arc<dyn crawl4rs_core::Fetcher>))
+}
+
+#[cfg(not(feature = "playwright"))]
+fn auto_login_setup() -> Option<AutoLogin> {
     None
 }
 
@@ -401,11 +454,22 @@ async fn run_serve(host: String, port: u16, stealth: bool) -> Result<()> {
     // El servidor sirve todos los modos: HTTP rápido + marcha larga. `mode` de
     // cada `POST /crawl` decide cuál se usa (auto por defecto). La marcha larga
     // es Playwright si CRAWL4RS_PLAYWRIGHT_URL está definida; si no, el navegador propio.
-    let long_gear: Arc<dyn crawl4rs_core::Fetcher> =
-        playwright_gear().unwrap_or_else(|| browser.clone() as Arc<dyn crawl4rs_core::Fetcher>);
+    let auto = auto_login_setup();
+    let long_gear: Arc<dyn crawl4rs_core::Fetcher> = match &auto {
+        Some((_, _, pf)) => pf.clone(),
+        None => {
+            playwright_gear().unwrap_or_else(|| browser.clone() as Arc<dyn crawl4rs_core::Fetcher>)
+        }
+    };
     let mut crawler = Crawler::new(browser.clone()).with_browser_fetcher(long_gear);
-    if let Ok(http) = HttpFetcher::new() {
+    if let Ok(mut http) = HttpFetcher::new() {
+        if let Some((cell, _, _)) = &auto {
+            http = http.with_session_cell(cell.clone());
+        }
         crawler = crawler.with_http_fetcher(Arc::new(http));
+    }
+    if let Some((cell, auth_login, _)) = auto {
+        crawler = crawler.with_auto_login(auth_login, cell);
     }
 
     let addr: SocketAddr = format!("{host}:{port}")
