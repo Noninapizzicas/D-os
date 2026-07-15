@@ -75,11 +75,17 @@ El motor está operativo cuando, con los dos contenedores levantados, puede:
 - **Wrapper:** `emular:{geo|idioma|dispositivo}`.
 - **Desbloquea:** precios por región, versión móvil.
 
-### 7. Despliegue conjunto
-- `docker-compose.yml`: `crawl4rs` + `playwright-wrapper` en la misma red,
-  `CRAWL4RS_PLAYWRIGHT_URL` cableado, healthchecks. (Embutir en uno sigue
-  disponible sin tocar el contrato.)
-- **Desbloquea:** "levanto y funciona".
+### 7. Despliegue conjunto ✅ (base)
+- **Topología acordada:** el wrapper de Playwright vive **dentro del contenedor
+  que ya tiene Chromium** (se conecta por CDP, `PLAYWRIGHT_CDP_URL`, sin lanzar
+  un segundo navegador); **Crawl4RS va por su cuenta** en su contenedor.
+- ✅ `docker-compose.yml` en la raíz: servicios `browser` (wrapper+Chromium) y
+  `crawl4rs` (separado), con `CRAWL4RS_PLAYWRIGHT_URL=http://browser:8100`
+  cableado y `CRAWL4RS_LOGIN` opcional documentado.
+- ✅ Wrapper con doble modo: **conectar** (CDP, Chromium ya corriendo) o
+  **lanzar** (imagen oficial). El contrato no cambia — es cable.
+- **Desbloquea:** "levanto y funciona". Verificación en vivo del CDP contra un
+  Chromium en marcha: fuera del sandbox (el sandbox no expone un CDP suelto).
 
 ### 8. Verificación en vivo (fuera del sandbox)
 - Un sitio JS real (render), un **login real** (sesión), un anti-bot medio

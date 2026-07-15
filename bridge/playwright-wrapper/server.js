@@ -29,18 +29,27 @@ const NAV_TIMEOUT = Number(process.env.NAV_TIMEOUT_MS) || 30000;
 
 // Un solo navegador para todo el proceso; un contexto nuevo por petición
 // (aislamiento). Se lanza perezoso en la primera petición.
+// Dos formas de tener navegador, según dónde viva el wrapper:
+//  - PLAYWRIGHT_CDP_URL → se CONECTA a un Chromium YA corriendo (p. ej. embutido
+//    en el contenedor que ya tiene Chromium). No arranca un segundo navegador.
+//  - si no → LANZA uno propio (Docker oficial de Playwright). PLAYWRIGHT_EXECUTABLE_PATH
+//    es un escape-hatch para binarios en rutas que Playwright no espera.
+function lanzarOConectar() {
+  if (process.env.PLAYWRIGHT_CDP_URL) {
+    return chromium.connectOverCDP(process.env.PLAYWRIGHT_CDP_URL);
+  }
+  const opts = { headless: true };
+  if (process.env.PLAYWRIGHT_EXECUTABLE_PATH) {
+    opts.executablePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH;
+  }
+  return chromium.launch(opts);
+}
+
 let browserPromise = null;
 function browser() {
   if (!browserPromise) {
-    // Escape-hatch para entornos donde el binario no está en la ruta que
-    // Playwright espera (revisiones que no cuadran). En el Docker oficial no
-    // hace falta. Ver PLAYWRIGHT_BROWSERS_PATH/executablePath.
-    const opts = { headless: true };
-    if (process.env.PLAYWRIGHT_EXECUTABLE_PATH) {
-      opts.executablePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH;
-    }
-    browserPromise = chromium.launch(opts).catch((e) => {
-      browserPromise = null; // permite reintentar si el lanzamiento falló
+    browserPromise = lanzarOConectar().catch((e) => {
+      browserPromise = null; // permite reintentar si falló
       throw e;
     });
   }

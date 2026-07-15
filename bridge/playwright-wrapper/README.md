@@ -57,14 +57,27 @@ curl -s -X POST localhost:8100/abrir -H 'content-type: application/json' \
   -d '{"url":"https://example.com"}' | head -c 200
 ```
 
+## Navegador: lanzar o conectar
+
+Dos formas, según dónde viva el wrapper (variables de entorno):
+
+- **`PLAYWRIGHT_CDP_URL`** → se **conecta** a un Chromium **ya corriendo** por
+  CDP (p. ej. embutido en el contenedor que ya tiene Chromium). No arranca un
+  segundo navegador. Ej.: `PLAYWRIGHT_CDP_URL=http://127.0.0.1:9222`.
+- **sin ella** → **lanza** su propio Chromium (imagen oficial de Playwright).
+  `PLAYWRIGHT_EXECUTABLE_PATH` es un escape-hatch para binarios en rutas que
+  Playwright no espera.
+
 ## Topología
 
-El wrapper vive **dentro del contenedor de Playwright**; Crawl4RS en el suyo;
-hablan por HTTP en la red de Docker. Embutir todo en un contenedor sigue
-disponible sin tocar el contrato — es cable, no contrato.
+El wrapper vive **dentro del contenedor que ya tiene Chromium** (conectándose
+por CDP); Crawl4RS va **por su cuenta**, en el suyo; hablan por HTTP en la red
+de Docker. Alternativa: construir esta imagen (lanza su propio Chromium). El
+contrato no cambia entre ambas — es cable. Ver `docker-compose.yml` en la raíz.
 
 ## Estado
 
-`/abrir` (render simple) y `/health` implementados. El resto del contrato,
-reservado. La verificación en vivo contra la web pública se hace fuera del
-sandbox (egress y navegador gestionados por el entorno).
+`/abrir` (render + `sesion`), `/login` (guion → `storageState`) y `/health`
+implementados; conexión por CDP o lanzamiento propio. El resto del contrato,
+reservado. La verificación en vivo (web pública, login real, CDP contra un
+Chromium en marcha) se hace fuera del sandbox.
