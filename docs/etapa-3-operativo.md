@@ -25,17 +25,23 @@ El motor está operativo cuando, con los dos contenedores levantados, puede:
 
 ## Etapa 3 — los `reservada → ahora`, por valor
 
-### 1. Login → sesión  · (el que desbloquea el caso real)
-- **Wrapper:** `POST /abrir { url, login }` → devuelve `sesion` (`storageState`:
-  cookies + localStorage). Guion de login (selectores) como primer camino.
-- **Crawl4RS:** `SessionAuth` que el `Fetcher` inyecta (cookies/cabeceras) en el
-  fetch HTTP **y** en la marcha larga.
-- **Desbloquea:** entrar con user/contraseña; el resto del catálogo ya es visible.
+### 1. Login → sesión ✅ (el que desbloquea el caso real)
+- **Wrapper:** `POST /login { url, pasos }` ejecuta un guion (`fill`/`click`/
+  `wait`) y devuelve `sesion` (`storageState`: cookies + localStorage);
+  `POST /abrir { url, sesion }` abre ya autenticado.
+- **Crawl4RS:** tipo [`Session`] + `PlaywrightFetcher::login/with_session`
+  (marcha larga, sesión entera) y `HttpFetcher::with_session` (marcha corta,
+  solo cookies — el localStorage no viaja por HTTP, honesto).
+- **Verificado en vivo:** `/login` con Chromium real captura la cookie tras el
+  guion; 6 tests nuevos en verde (sesión, cookie en marcha corta, sesión en el
+  cuerpo, login).
+- **Pendiente de la #2:** cablear la captura en la escalación automática.
 
 ### 2. Reutilización de sesión + re-login
-- **Crawl4RS:** inyecta la `sesion` en el volumen (marcha corta); al detectar
-  401 / redirección-a-login (`looks_like_challenge` generalizado a "sesión
-  perdida") pide re-login a la marcha larga y refresca.
+- ✅ Inyección de la `sesion` en ambas marchas (hecho en #1).
+- **Falta:** el **lazo automático** — que `auto` haga login (marcha larga) al
+  detectar 401 / redirección-a-login (`looks_like_challenge` generalizado a
+  "sesión perdida"), guarde la sesión y la reutilice en el volumen.
 - **Desbloquea:** volumen autenticado barato y sesiones que caducan sin romperse.
 
 ### 3. Interacción para revelar

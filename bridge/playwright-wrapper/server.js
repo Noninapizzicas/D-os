@@ -47,9 +47,11 @@ function browser() {
   return browserPromise;
 }
 
-async function abrir({ url }) {
+// Abre una página. Si `sesion` (storageState) viene, el contexto arranca ya
+// autenticado. RESERVADO: interactuar, interceptar, emular, capturar.
+async function abrir({ url, sesion }) {
   const b = await browser();
-  const context = await b.newContext();
+  const context = await b.newContext(sesion ? { storageState: sesion } : {});
   try {
     const page = await context.newPage();
     const resp = await page.goto(url, {
@@ -62,9 +64,38 @@ async function abrir({ url }) {
       final_url: page.url(),
       status: resp ? resp.status() : null,
     };
-    // RESERVADO: interactuar (scroll/click), login -> sesion (storageState),
-    // interceptar (page.on('response')), emular (context locale/geo),
-    // capturar (screenshot/pdf). Se añaden aquí sin tocar el contrato.
+  } finally {
+    await context.close();
+  }
+}
+
+// Ejecuta un guion de pasos (fill/click/wait) y captura la sesión resultante
+// (storageState = cookies + localStorage). No inventa nada: si un paso falla,
+// el llamador recibe el fallo.
+async function login({ url, pasos }) {
+  const b = await browser();
+  const context = await b.newContext();
+  try {
+    const page = await context.newPage();
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT });
+    for (const paso of pasos || []) {
+      switch (paso.tipo) {
+        case 'fill':
+          await page.fill(paso.selector, String(paso.valor ?? ''));
+          break;
+        case 'click':
+          await page.click(paso.selector);
+          break;
+        case 'wait':
+          if (paso.selector) await page.waitForSelector(paso.selector, { timeout: NAV_TIMEOUT });
+          else await page.waitForTimeout(Number(paso.ms) || 500);
+          break;
+        default:
+          throw new Error(`paso desconocido: ${paso.tipo}`);
+      }
+    }
+    const sesion = await context.storageState();
+    return { sesion, final_url: page.url() };
   } finally {
     await context.close();
   }
@@ -84,27 +115,28 @@ const server = http.createServer((req, res) => {
     return enviar(res, 200, { status: 'ok', playwright_ready: browserPromise !== null });
   }
 
-  if (req.method === 'POST' && req.url === '/abrir') {
+  if (req.method === 'POST' && (req.url === '/abrir' || req.url === '/login')) {
+    const ruta = req.url;
     let body = '';
     req.on('data', (c) => {
       body += c;
-      if (body.length > 1e6) req.destroy(); // guarda contra cuerpos gigantes
+      if (body.length > 5e7) req.destroy(); // guarda contra cuerpos gigantes
     });
     req.on('end', async () => {
-      let url;
+      let datos;
       try {
-        ({ url } = JSON.parse(body || '{}'));
+        datos = JSON.parse(body || '{}');
       } catch {
         return enviar(res, 400, { fallo: { tipo: 'peticion_invalida', motivo: 'JSON ilegible' } });
       }
-      if (!url) {
+      if (!datos.url) {
         return enviar(res, 400, { fallo: { tipo: 'peticion_invalida', motivo: 'falta url' } });
       }
       try {
-        const out = await abrir({ url });
+        const out = ruta === '/login' ? await login(datos) : await abrir(datos);
         enviar(res, 200, out);
       } catch (e) {
-        // No inventamos HTML: reportamos el fallo real.
+        // No inventamos nada: reportamos el fallo real.
         const motivo = (e && e.message) ? String(e.message) : String(e);
         const tipo = /timeout/i.test(motivo) ? 'timeout' : 'error';
         enviar(res, 200, { fallo: { tipo, motivo } });

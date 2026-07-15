@@ -6,10 +6,13 @@
 //! orquestador lo usa como camino por defecto y sólo escala a navegador
 //! cuando hace falta (ver [`crate::config::FetchMode`]).
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 
 use crate::error::{Error, Result};
 use crate::fetch::{FetchedPage, Fetcher};
+use crate::session::Session;
 
 const DEFAULT_UA: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 \
     (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
@@ -18,6 +21,8 @@ const DEFAULT_UA: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 \
 #[derive(Clone)]
 pub struct HttpFetcher {
     client: reqwest::Client,
+    /// Sesión reutilizada (marcha corta): solo aporta las cookies.
+    session: Option<Arc<Session>>,
 }
 
 impl HttpFetcher {
@@ -44,19 +49,29 @@ impl HttpFetcher {
                 url: "<cliente http>".into(),
                 source: Box::new(e),
             })?;
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            session: None,
+        })
+    }
+
+    /// Reutiliza una sesión: en la marcha corta solo se inyectan sus **cookies**
+    /// (el localStorage no viaja por HTTP). Additivo: sin sesión, igual que antes.
+    pub fn with_session(mut self, session: Session) -> Self {
+        self.session = Some(Arc::new(session));
+        self
     }
 }
 
 #[async_trait]
 impl Fetcher for HttpFetcher {
     async fn fetch(&self, url: &str) -> Result<FetchedPage> {
-        let resp = self
-            .client
-            .get(url)
-            .send()
-            .await
-            .map_err(|e| Error::fetch(url, e))?;
+        let mut req = self.client.get(url);
+        // Marcha corta autenticada: inyecta las cookies de la sesión, si hay.
+        if let Some(cookie) = self.session.as_ref().and_then(|s| s.cookie_header()) {
+            req = req.header(reqwest::header::COOKIE, cookie);
+        }
+        let resp = req.send().await.map_err(|e| Error::fetch(url, e))?;
         let status = resp.status().as_u16();
         let final_url = resp.url().to_string();
         let content_type = resp
@@ -97,5 +112,54 @@ impl Fetcher for HttpFetcher {
                 bytes: None,
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+
+    /// Servidor de un golpe que captura la petición y responde HTML.
+    fn servidor_captura() -> (String, std::sync::mpsc::Receiver<String>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut buf = [0u8; 8192];
+                let n = stream.read(&mut buf).unwrap_or(0);
+                let _ = tx.send(String::from_utf8_lossy(&buf[..n]).into_owned());
+                let body = "<html><body>ok</body></html>";
+                let resp = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                let _ = stream.write_all(resp.as_bytes());
+            }
+        });
+        (format!("http://{addr}/"), rx)
+    }
+
+    #[tokio::test]
+    async fn inyecta_la_cookie_de_la_sesion() {
+        let (url, rx) = servidor_captura();
+        let sesion = Session::from_storage_state(
+            serde_json::json!({ "cookies": [{ "name": "sid", "value": "abc" }] }),
+        );
+        let f = HttpFetcher::new().unwrap().with_session(sesion);
+        f.fetch(&url).await.unwrap();
+        let req = rx.recv().unwrap().to_ascii_lowercase();
+        assert!(req.contains("cookie: sid=abc"), "req fue: {req}");
+    }
+
+    #[tokio::test]
+    async fn sin_sesion_no_manda_cookie() {
+        let (url, rx) = servidor_captura();
+        let f = HttpFetcher::new().unwrap();
+        f.fetch(&url).await.unwrap();
+        let req = rx.recv().unwrap().to_ascii_lowercase();
+        assert!(!req.contains("cookie:"), "no debería mandar cookie: {req}");
     }
 }

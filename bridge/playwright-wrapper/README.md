@@ -9,30 +9,33 @@ hace `POST /abrir` con `reqwest`. Ver `docs/contrato-puente-prisma.md`.
 
 ## Contrato (`contrato-puente-v1`)
 
-### Implementado — subconjunto `ahora`
+### Implementado
 
 ```text
-POST /abrir   { "url": "https://…" }
+POST /abrir   { "url": "https://…", "sesion"? }
   200 -> { "html": "<!doctype…>", "final_url": "https://…", "status": 200 }
   200 -> { "fallo": { "tipo": "timeout|error", "motivo": "…" } }   (no inventa HTML)
   400 -> { "fallo": { "tipo": "peticion_invalida", "motivo": "…" } }
 
+POST /login   { "url": "https://…", "pasos": [ … ] }
+  200 -> { "sesion": <storageState>, "final_url": "…" }
+  200 -> { "fallo": { … } }   (no inventa sesión)
+
 GET  /health  -> { "status": "ok", "playwright_ready": true|false }
 ```
 
+- **`sesion`** en `/abrir` = `storageState` de Playwright → abre ya autenticado.
+- **`pasos`** en `/login` = guion de acciones que captura la sesión:
+  `{ "tipo": "fill", "selector": "#user", "valor": "yo" }` ·
+  `{ "tipo": "click", "selector": "#entrar" }` ·
+  `{ "tipo": "wait", "selector"|"ms": … }`.
+
 ### Declarado, RESERVADO
 
-Las "5 líneas de más": se nombran en el contrato aunque no se implementen aún,
-para que añadirlas sea *rellenar*, no *rediseñar*.
+Las "5 líneas de más": nombradas en el contrato, para que añadirlas sea
+*rellenar*, no *rediseñar*.
 
-```text
-POST /abrir { url, interactuar?, login?, interceptar?, emular?, capturar? }
-  -> { html, final_url, status, sesion?, intercepted?, artefactos? }
-```
-
-- **interactuar** — scroll / click / fill_form / wait antes de leer el DOM.
-- **login** → **sesion** (`storageState`: cookies + localStorage) para que
-  Crawl4RS reutilice la sesión en el volumen.
+- **interactuar** en `/abrir` — scroll / click / fill_form antes de leer el DOM.
 - **interceptar** — capturar el JSON de la API interna del sitio.
 - **emular** — dispositivo / geo / idioma.
 - **capturar** — screenshot / pdf.

@@ -32,6 +32,7 @@ pub mod pdf;
 #[cfg(feature = "playwright")]
 pub mod playwright;
 pub mod result;
+pub mod session;
 
 #[cfg(feature = "browser")]
 pub use browser::{
@@ -56,6 +57,7 @@ pub use http::HttpFetcher;
 #[cfg(feature = "playwright")]
 pub use playwright::PlaywrightFetcher;
 pub use result::CrawlResult;
+pub use session::Session;
 
 #[cfg(test)]
 mod tests {
