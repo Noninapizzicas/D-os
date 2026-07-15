@@ -144,15 +144,27 @@ marcada `ahora` (implementar ya) o `reservada` (declarada, sin código).
 
   // Transversal
   "sesion":     "storageState = cookies + localStorage  (objeto de intercambio clave)",
-  "transporte": "ABIERTO: MCP existente | HTTP fino  (es cable, no contrato)",
-  "topologia":  "ABIERTO: dos contenedores | embutido",
+  "transporte": "DECIDIDO: HTTP fino. Un wrapper Node minúsculo envuelve Playwright-librería y expone ESTE contrato como endpoints (POST /abrir, POST /extraer-no: extraer vive en Crawl4RS). Crawl4RS llama con reqwest. El MCP de Playwright se RESERVA para la capa de agente (LLM pilotando el navegador), no para este puente determinista.",
+  "topologia":  "DECIDIDO: el wrapper HTTP vive DENTRO del contenedor de Playwright; Crawl4RS en el suyo; hablan por HTTP en la red de Docker. (Embutir en un solo contenedor sigue disponible sin cambiar el contrato — es cable.)",
   "honestidad": "el fallo se REPORTA, no se inventa (verdad_obligatoria de ambos)",
   "version":    "v1; capacidades = ahora | reservada"
 }
 ```
 
+### Decisión de transporte (cerrada)
+
+**Puente = HTTP fino (Opción B).** Razón: el puente Crawl4RS↔Playwright es
+máquina-a-máquina y determinista (un *servicio*, no una conversación de
+agente). El HTTP fino hace que **el contrato sea la API 1:1**; el lado Rust es
+un `POST` con `reqwest`, sin cliente MCP ni superficie de protocolo. El wrapper
+es la opción con **menos Node** (Playwright ya es Node; envolverlo fino cuesta
+menos que un cliente MCP en Rust) y vive **dentro** del contenedor de
+Playwright, sin contaminar el lado Rust. El **MCP existente se reserva para la
+capa de agente** — cada transporte en su registro, sobre el mismo Playwright.
+
 ### Preguntas abiertas del contrato (no se inventan)
-- **Transporte y topología Docker** (MCP vs HTTP; dos contenedores vs embutido).
+- ~~Transporte y topología Docker~~ → **CERRADO**: HTTP fino, wrapper dentro
+  del contenedor de Playwright, MCP reservado para agente (ver arriba).
 - **Forma exacta del login** (guion por selectores vs blueprint LLM).
 - **Custodia de la sesión** (¿la guarda el puente? ¿caducidad/refresco?).
 - **MFA/OTP** (fuente externa).
