@@ -401,7 +401,42 @@ fn proxy_config() -> Option<serde_json::Value> {
     Some(p)
 }
 
-/// Aplica interacción, interceptación, stealth y proxy (env) a la marcha larga.
+/// Emulación desde envs amigables: `CRAWL4RS_LOCALE`, `CRAWL4RS_TIMEZONE`,
+/// `CRAWL4RS_MOBILE` (1/true) y `CRAWL4RS_GEO` (`lat,lon`).
+#[cfg(feature = "playwright")]
+fn emulate_config() -> Option<serde_json::Value> {
+    let mut e = serde_json::Map::new();
+    if let Ok(l) = std::env::var("CRAWL4RS_LOCALE") {
+        e.insert("locale".into(), serde_json::json!(l));
+    }
+    if let Ok(t) = std::env::var("CRAWL4RS_TIMEZONE") {
+        e.insert("timezone".into(), serde_json::json!(t));
+    }
+    if std::env::var("CRAWL4RS_MOBILE")
+        .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
+        .unwrap_or(false)
+    {
+        e.insert("movil".into(), serde_json::json!(true));
+    }
+    if let Ok(g) = std::env::var("CRAWL4RS_GEO") {
+        if let Some((lat, lon)) = g.split_once(',') {
+            if let (Ok(lat), Ok(lon)) = (lat.trim().parse::<f64>(), lon.trim().parse::<f64>()) {
+                e.insert(
+                    "geo".into(),
+                    serde_json::json!({ "latitude": lat, "longitude": lon }),
+                );
+            }
+        }
+    }
+    if e.is_empty() {
+        None
+    } else {
+        Some(serde_json::Value::Object(e))
+    }
+}
+
+/// Aplica interacción, interceptación, stealth, proxy y emulación (env) a la
+/// marcha larga.
 #[cfg(feature = "playwright")]
 fn con_interact_intercept(
     mut pf: crawl4rs_core::PlaywrightFetcher,
@@ -420,6 +455,9 @@ fn con_interact_intercept(
     }
     if let Some(proxy) = proxy_config() {
         pf = pf.with_proxy(proxy);
+    }
+    if let Some(emular) = emulate_config() {
+        pf = pf.with_emulate(emular);
     }
     pf
 }

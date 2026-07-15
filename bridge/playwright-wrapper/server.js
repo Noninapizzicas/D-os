@@ -76,15 +76,35 @@ function parcheStealth() {
   }
 }
 
+// UA móvil por defecto para la emulación de dispositivo.
+const UA_MOVIL =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+
 // Crea un contexto con las opciones de la petición: sesión (storageState),
-// proxy ({ server, username?, password? }) y stealth (UA + parche).
-async function crearContexto(b, { sesion, proxy, stealth }) {
+// proxy, stealth (UA + parche) y emular ({ locale, timezone, geo, movil }).
+// El orden importa: emular puede sobrescribir UA/locale del stealth.
+async function crearContexto(b, { sesion, proxy, stealth, emular }) {
   const opts = {};
   if (sesion) opts.storageState = sesion;
   if (proxy) opts.proxy = proxy;
   if (stealth) {
     opts.userAgent = UA_STEALTH;
     opts.locale = 'es-ES';
+  }
+  if (emular) {
+    if (emular.locale) opts.locale = emular.locale;
+    if (emular.timezone) opts.timezoneId = emular.timezone;
+    if (emular.geo) {
+      opts.geolocation = emular.geo; // { latitude, longitude }
+      opts.permissions = [...(opts.permissions || []), 'geolocation'];
+    }
+    if (emular.movil) {
+      opts.viewport = { width: 390, height: 844 };
+      opts.isMobile = true;
+      opts.hasTouch = true;
+      opts.deviceScaleFactor = 3;
+      opts.userAgent = emular.ua_movil || UA_MOVIL;
+    }
   }
   const context = await b.newContext(opts);
   if (stealth) await context.addInitScript(parcheStealth);
@@ -128,9 +148,9 @@ async function ejecutarPasos(page, pasos) {
 // → guion de pasos antes de leer el DOM. `interceptar` → captura el JSON que la
 // página pide a su API interna (`true` = todo JSON; `{contiene:[…]}` = filtra por
 // URL). RESERVADO: emular, capturar.
-async function abrir({ url, sesion, interactuar, interceptar, stealth, proxy }) {
+async function abrir({ url, sesion, interactuar, interceptar, stealth, proxy, emular }) {
   const b = await browser();
-  const context = await crearContexto(b, { sesion, proxy, stealth });
+  const context = await crearContexto(b, { sesion, proxy, stealth, emular });
   try {
     const page = await context.newPage();
 
@@ -177,9 +197,9 @@ async function abrir({ url, sesion, interactuar, interceptar, stealth, proxy }) 
 // Ejecuta un guion de pasos (fill/click/wait) y captura la sesión resultante
 // (storageState = cookies + localStorage). No inventa nada: si un paso falla,
 // el llamador recibe el fallo.
-async function login({ url, pasos, stealth, proxy }) {
+async function login({ url, pasos, stealth, proxy, emular }) {
   const b = await browser();
-  const context = await crearContexto(b, { proxy, stealth });
+  const context = await crearContexto(b, { proxy, stealth, emular });
   try {
     const page = await context.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT });

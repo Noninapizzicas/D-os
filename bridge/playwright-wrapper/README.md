@@ -12,7 +12,7 @@ hace `POST /abrir` con `reqwest`. Ver `docs/contrato-puente-prisma.md`.
 ### Implementado
 
 ```text
-POST /abrir   { "url", "sesion"?, "interactuar"?, "interceptar"?, "stealth"?, "proxy"? }
+POST /abrir   { "url", "sesion"?, "interactuar"?, "interceptar"?, "stealth"?, "proxy"?, "emular"? }
   200 -> { "html": "…", "final_url": "…", "status": 200, "intercepted"?: [{url,status,json}] }
   200 -> { "fallo": { "tipo": "timeout|error", "motivo": "…" } }   (no inventa HTML)
   400 -> { "fallo": { "tipo": "peticion_invalida", "motivo": "…" } }
@@ -39,13 +39,14 @@ GET  /health  -> { "status": "ok", "playwright_ready": true|false }
   DataDome/Turnstile.
 - **`proxy`** = `{ "server": "http://host:puerto", "username"?, "password"? }`
   aplicado por contexto (también en `/login`).
+- **`emular`** = `{ "locale"?, "timezone"?, "geo"?: {latitude,longitude},
+  "movil"?: bool }` — idioma, zona horaria, geolocalización y perfil móvil.
 
 ### Declarado, RESERVADO
 
 Las "5 líneas de más": nombradas en el contrato, para que añadirlas sea
 *rellenar*, no *rediseñar*.
 
-- **emular** — dispositivo / geo / idioma.
 - **capturar** — screenshot / pdf.
 
 ## Arranque

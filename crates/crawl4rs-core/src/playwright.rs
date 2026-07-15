@@ -41,6 +41,8 @@ pub struct PlaywrightFetcher {
     stealth: bool,
     /// Proxy de salida (`{ server, username?, password? }`).
     proxy: Option<serde_json::Value>,
+    /// Emulación (`{ locale?, timezone?, geo?, movil? }`).
+    emulate: Option<serde_json::Value>,
 }
 
 fn es_false(b: &bool) -> bool {
@@ -66,6 +68,9 @@ struct AbrirReq<'a> {
     /// Proxy de salida (reservado → ahora).
     #[serde(skip_serializing_if = "Option::is_none")]
     proxy: Option<&'a serde_json::Value>,
+    /// Emulación (reservado → ahora).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    emular: Option<&'a serde_json::Value>,
 }
 
 /// Cuerpo de `POST /login`.
@@ -77,6 +82,8 @@ struct LoginReq<'a> {
     stealth: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     proxy: Option<&'a serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    emular: Option<&'a serde_json::Value>,
 }
 
 /// Respuesta de `POST /login`.
@@ -127,6 +134,7 @@ impl PlaywrightFetcher {
             intercept: None,
             stealth: false,
             proxy: None,
+            emulate: None,
         })
     }
 
@@ -166,6 +174,13 @@ impl PlaywrightFetcher {
         self
     }
 
+    /// Configura la emulación:
+    /// `{ "locale"?, "timezone"?, "geo"?: {latitude,longitude}, "movil"?: bool }`.
+    pub fn with_emulate(mut self, config: serde_json::Value) -> Self {
+        self.emulate = Some(config);
+        self
+    }
+
     /// Comparte una celda de sesión (la que el re-login refresca en caliente).
     pub fn with_session_cell(mut self, cell: SessionCell) -> Self {
         self.session = Some(cell);
@@ -195,6 +210,7 @@ impl PlaywrightFetcher {
             pasos: &pasos,
             stealth: self.stealth,
             proxy: self.proxy.as_ref(),
+            emular: self.emulate.as_ref(),
         })
         .map_err(|e| Error::Browser(format!("no se pudo serializar el login: {e}")))?;
         let resp = self
@@ -245,6 +261,7 @@ impl Fetcher for PlaywrightFetcher {
             interceptar: self.intercept.as_ref(),
             stealth: self.stealth,
             proxy: self.proxy.as_ref(),
+            emular: self.emulate.as_ref(),
         })
         .map_err(|e| Error::Browser(format!("no se pudo serializar la petición: {e}")))?;
 
@@ -439,5 +456,18 @@ mod tests {
         let req = rx.recv().unwrap();
         assert!(!req.contains("stealth"), "sin stealth no se envía");
         assert!(!req.contains("proxy"), "sin proxy no se envía");
+        assert!(!req.contains("emular"), "sin emular no se envía");
+    }
+
+    #[tokio::test]
+    async fn abrir_incluye_la_emulacion_en_el_cuerpo() {
+        let (endpoint, rx) = servidor_captura(r#"{"html":"<b>ok</b>","status":200}"#);
+        let f = PlaywrightFetcher::new(endpoint)
+            .unwrap()
+            .with_emulate(serde_json::json!({ "locale": "fr-FR", "movil": true }));
+        f.fetch("https://x/").await.unwrap();
+        let req = rx.recv().unwrap();
+        assert!(req.contains("\"emular\""), "el cuerpo lleva emular");
+        assert!(req.contains("fr-FR"), "lleva el locale");
     }
 }

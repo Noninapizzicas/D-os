@@ -89,8 +89,14 @@ El motor está operativo cuando, con los dos contenedores levantados, puede:
   comportamiento y señales de *headless* incluso con esto — **no se promete**.
   Para esos, hace falta residencial + ritmo humano, y a veces no hay solución.
 
-### 6. Emulación
-- **Wrapper:** `emular:{geo|idioma|dispositivo}`.
+### 6. Emulación ✅
+- **Wrapper:** `emular:{ locale?, timezone?, geo?:{latitude,longitude}, movil? }`
+  en `/abrir` y `/login` (locale, timezone, geolocalización con permiso, y perfil
+  móvil: viewport + touch + UA).
+- **Crawl4RS:** `PlaywrightFetcher::with_emulate(cfg)`. **CLI:** `CRAWL4RS_LOCALE`,
+  `CRAWL4RS_TIMEZONE`, `CRAWL4RS_MOBILE=1`, `CRAWL4RS_GEO="lat,lon"`.
+- **Verificado en vivo:** `navigator.language` pasa a `fr-FR` y el perfil móvil
+  activa el táctil. Test en verde.
 - **Desbloquea:** precios por región, versión móvil.
 
 ### 7. Despliegue conjunto ✅ (base)
