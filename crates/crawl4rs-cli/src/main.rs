@@ -338,7 +338,10 @@ where
 fn playwright_gear() -> Option<Arc<dyn crawl4rs_core::Fetcher>> {
     let url = std::env::var("CRAWL4RS_PLAYWRIGHT_URL").ok()?;
     match crawl4rs_core::PlaywrightFetcher::new(&url) {
-        Ok(f) => {
+        Ok(mut f) => {
+            if let Some(pasos) = interact_pasos() {
+                f = f.with_interact(pasos);
+            }
             eprintln!("Marcha larga: Playwright en {url}");
             Some(Arc::new(f))
         }
@@ -347,6 +350,19 @@ fn playwright_gear() -> Option<Arc<dyn crawl4rs_core::Fetcher>> {
             None
         }
     }
+}
+
+/// Guion de interacción (scroll/click/…) desde `CRAWL4RS_INTERACT` (ruta a un
+/// JSON con la lista de pasos). El wrapper lo ejecuta antes de leer el DOM.
+#[cfg(feature = "playwright")]
+fn interact_pasos() -> Option<serde_json::Value> {
+    let path = std::env::var("CRAWL4RS_INTERACT").ok()?;
+    let contents = std::fs::read_to_string(&path)
+        .map_err(|e| eprintln!("AVISO: no pude leer CRAWL4RS_INTERACT ({path}): {e}"))
+        .ok()?;
+    serde_json::from_str(&contents)
+        .map_err(|e| eprintln!("AVISO: guion de interacción inválido: {e}"))
+        .ok()
 }
 
 #[cfg(not(feature = "playwright"))]
@@ -380,9 +396,12 @@ fn auto_login_setup() -> Option<AutoLogin> {
         .unwrap_or_else(|| serde_json::json!([]));
 
     let cell = crawl4rs_core::session::empty_session_cell();
-    let pf = crawl4rs_core::PlaywrightFetcher::new(&endpoint)
+    let mut pf = crawl4rs_core::PlaywrightFetcher::new(&endpoint)
         .ok()?
         .with_session_cell(cell.clone());
+    if let Some(guion) = interact_pasos() {
+        pf = pf.with_interact(guion);
+    }
     let auth: Arc<dyn crawl4rs_core::session::Authenticator> =
         Arc::new(pf.authenticator(login_url, pasos));
     eprintln!("Auto-login: receta {recipe_path} vía {endpoint}");

@@ -54,10 +54,15 @@ El motor está operativo cuando, con los dos contenedores levantados, puede:
   y activan el lazo. Sin ellas, comportamiento idéntico (additivo). Verificado:
   el CLI lee la receta y anuncia `Auto-login: receta … vía …`.
 
-### 3. Interacción para revelar
-- **Wrapper:** `POST /abrir { url, interactuar:[scroll|click|fill_form|wait] }`
-  antes de leer el DOM; cerrar banners de cookies/geo.
-- **Desbloquea:** scroll infinito, "cargar más", pestañas, precio al hover.
+### 3. Interacción para revelar ✅
+- **Wrapper:** `POST /abrir { url, interactuar:[…] }` ejecuta un guion antes de
+  leer el DOM: `fill` · `click` · `wait` · `scroll {veces,pausa_ms}` (baja al
+  fondo N veces para scroll infinito / lazy-load). Compartido con `/login`.
+- **Crawl4RS:** `PlaywrightFetcher::with_interact(pasos)` incluye el guion en
+  cada `/abrir`. **CLI:** `CRAWL4RS_INTERACT` = ruta a un JSON de pasos.
+- **Verificado en vivo:** un click revela contenido dinámico ausente sin él
+  (marcador generado por JS, no en el fuente). Test en verde.
+- **Desbloquea:** scroll infinito, "cargar más", pestañas, contenido tras clic.
 
 ### 4. Interceptar API interna
 - **Wrapper:** `interceptar:true` → captura el JSON que la web se pide a sí

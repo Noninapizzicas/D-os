@@ -33,6 +33,8 @@ pub struct PlaywrightFetcher {
     /// Sesión a reutilizar (`storageState`) en cada `POST /abrir`, si la hay.
     /// Celda compartida para que el re-login la refresque en caliente.
     session: Option<SessionCell>,
+    /// Guion de interacción (scroll/click/…) aplicado antes de leer el DOM.
+    interact: Option<serde_json::Value>,
 }
 
 /// Cuerpo de `POST /abrir`.
@@ -42,6 +44,9 @@ struct AbrirReq<'a> {
     /// `storageState` para abrir ya autenticado (reservado → ahora).
     #[serde(skip_serializing_if = "Option::is_none")]
     sesion: Option<&'a serde_json::Value>,
+    /// Guion de interacción antes de leer el DOM (reservado → ahora).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    interactuar: Option<&'a serde_json::Value>,
 }
 
 /// Cuerpo de `POST /login`.
@@ -93,6 +98,7 @@ impl PlaywrightFetcher {
             client,
             endpoint,
             session: None,
+            interact: None,
         })
     }
 
@@ -100,6 +106,13 @@ impl PlaywrightFetcher {
     /// autenticado. Additivo: sin sesión, se comporta igual que antes.
     pub fn with_session(mut self, session: Session) -> Self {
         self.session = Some(Arc::new(RwLock::new(Some(session))));
+        self
+    }
+
+    /// Configura un guion de interacción (scroll/click/fill/wait) que el wrapper
+    /// ejecuta antes de leer el DOM — para scroll infinito, "cargar más", etc.
+    pub fn with_interact(mut self, pasos: serde_json::Value) -> Self {
+        self.interact = Some(pasos);
         self
     }
 
@@ -173,6 +186,7 @@ impl Fetcher for PlaywrightFetcher {
         let body = serde_json::to_string(&AbrirReq {
             url,
             sesion: sesion_owned.as_ref(),
+            interactuar: self.interact.as_ref(),
         })
         .map_err(|e| Error::Browser(format!("no se pudo serializar la petición: {e}")))?;
 
@@ -313,5 +327,17 @@ mod tests {
         let req = rx.recv().unwrap();
         assert!(req.contains("/login"), "va a /login");
         assert!(req.contains("pasos"), "el cuerpo lleva los pasos");
+    }
+
+    #[tokio::test]
+    async fn abrir_incluye_el_guion_de_interaccion() {
+        let (endpoint, rx) = servidor_captura(r#"{"html":"<b>ok</b>","status":200}"#);
+        let f = PlaywrightFetcher::new(endpoint)
+            .unwrap()
+            .with_interact(serde_json::json!([{ "tipo": "scroll", "veces": 3 }]));
+        f.fetch("https://x/").await.unwrap();
+        let req = rx.recv().unwrap();
+        assert!(req.contains("\"interactuar\""), "el cuerpo lleva el guion");
+        assert!(req.contains("scroll"), "lleva el paso scroll");
     }
 }

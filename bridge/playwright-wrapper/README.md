@@ -12,7 +12,7 @@ hace `POST /abrir` con `reqwest`. Ver `docs/contrato-puente-prisma.md`.
 ### Implementado
 
 ```text
-POST /abrir   { "url": "https://…", "sesion"? }
+POST /abrir   { "url": "https://…", "sesion"?, "interactuar"?: [ … ] }
   200 -> { "html": "<!doctype…>", "final_url": "https://…", "status": 200 }
   200 -> { "fallo": { "tipo": "timeout|error", "motivo": "…" } }   (no inventa HTML)
   400 -> { "fallo": { "tipo": "peticion_invalida", "motivo": "…" } }
@@ -25,17 +25,18 @@ GET  /health  -> { "status": "ok", "playwright_ready": true|false }
 ```
 
 - **`sesion`** en `/abrir` = `storageState` de Playwright → abre ya autenticado.
-- **`pasos`** en `/login` = guion de acciones que captura la sesión:
+- **`interactuar`** / **`pasos`** = guion de acciones (mismo formato en `/abrir`
+  y `/login`):
   `{ "tipo": "fill", "selector": "#user", "valor": "yo" }` ·
   `{ "tipo": "click", "selector": "#entrar" }` ·
-  `{ "tipo": "wait", "selector"|"ms": … }`.
+  `{ "tipo": "wait", "selector"|"ms": … }` ·
+  `{ "tipo": "scroll", "veces": 3, "pausa_ms": 500 }` (scroll infinito / lazy).
 
 ### Declarado, RESERVADO
 
 Las "5 líneas de más": nombradas en el contrato, para que añadirlas sea
 *rellenar*, no *rediseñar*.
 
-- **interactuar** en `/abrir` — scroll / click / fill_form antes de leer el DOM.
 - **interceptar** — capturar el JSON de la API interna del sitio.
 - **emular** — dispositivo / geo / idioma.
 - **capturar** — screenshot / pdf.

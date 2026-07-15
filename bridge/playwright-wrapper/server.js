@@ -56,9 +56,43 @@ function browser() {
   return browserPromise;
 }
 
-// Abre una página. Si `sesion` (storageState) viene, el contexto arranca ya
-// autenticado. RESERVADO: interactuar, interceptar, emular, capturar.
-async function abrir({ url, sesion }) {
+// Ejecuta un guion de pasos sobre la página. Compartido por login e interacción.
+//   fill   { selector, valor }
+//   click  { selector }
+//   wait   { selector | ms }
+//   scroll { veces?, pausa_ms? }  → baja al fondo N veces (scroll infinito / lazy)
+async function ejecutarPasos(page, pasos) {
+  for (const paso of pasos || []) {
+    switch (paso.tipo) {
+      case 'fill':
+        await page.fill(paso.selector, String(paso.valor ?? ''));
+        break;
+      case 'click':
+        await page.click(paso.selector);
+        break;
+      case 'wait':
+        if (paso.selector) await page.waitForSelector(paso.selector, { timeout: NAV_TIMEOUT });
+        else await page.waitForTimeout(Number(paso.ms) || 500);
+        break;
+      case 'scroll': {
+        const veces = Number(paso.veces) || 1;
+        const pausa = Number(paso.pausa_ms) || 500;
+        for (let i = 0; i < veces; i += 1) {
+          await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+          await page.waitForTimeout(pausa);
+        }
+        break;
+      }
+      default:
+        throw new Error(`paso desconocido: ${paso.tipo}`);
+    }
+  }
+}
+
+// Abre una página. `sesion` (storageState) → arranca autenticado. `interactuar`
+// → guion de pasos antes de leer el DOM (scroll/click para revelar contenido).
+// RESERVADO: interceptar, emular, capturar.
+async function abrir({ url, sesion, interactuar }) {
   const b = await browser();
   const context = await b.newContext(sesion ? { storageState: sesion } : {});
   try {
@@ -67,6 +101,7 @@ async function abrir({ url, sesion }) {
       waitUntil: 'domcontentloaded',
       timeout: NAV_TIMEOUT,
     });
+    await ejecutarPasos(page, interactuar);
     const html = await page.content();
     return {
       html,
@@ -87,22 +122,7 @@ async function login({ url, pasos }) {
   try {
     const page = await context.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT });
-    for (const paso of pasos || []) {
-      switch (paso.tipo) {
-        case 'fill':
-          await page.fill(paso.selector, String(paso.valor ?? ''));
-          break;
-        case 'click':
-          await page.click(paso.selector);
-          break;
-        case 'wait':
-          if (paso.selector) await page.waitForSelector(paso.selector, { timeout: NAV_TIMEOUT });
-          else await page.waitForTimeout(Number(paso.ms) || 500);
-          break;
-        default:
-          throw new Error(`paso desconocido: ${paso.tipo}`);
-      }
-    }
+    await ejecutarPasos(page, pasos);
     const sesion = await context.storageState();
     return { sesion, final_url: page.url() };
   } finally {
