@@ -29,6 +29,8 @@ pub mod fetch;
 pub mod http;
 #[cfg(feature = "pdf")]
 pub mod pdf;
+#[cfg(feature = "playwright")]
+pub mod playwright;
 pub mod result;
 
 #[cfg(feature = "browser")]
@@ -51,6 +53,8 @@ pub use fetch::BrowserFetcher;
 pub use fetch::{FetchedPage, Fetcher, StaticFetcher};
 #[cfg(feature = "http")]
 pub use http::HttpFetcher;
+#[cfg(feature = "playwright")]
+pub use playwright::PlaywrightFetcher;
 pub use result::CrawlResult;
 
 #[cfg(test)]

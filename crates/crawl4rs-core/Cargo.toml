@@ -21,6 +21,9 @@ extract = ["dep:crawl4rs-extract"]
 http = ["dep:reqwest", "dep:tokio"]
 # Extracción de texto de PDF digital (sin OCR). Fuera del build `minimal`.
 pdf = ["dep:pdf-extract"]
+# Marcha larga: fetcher que delega en el wrapper HTTP de Playwright (puente
+# determinista; el MCP se reserva para la capa de agente). Opt-in.
+playwright = ["dep:reqwest", "dep:tokio"]
 
 [dependencies]
 crawl4rs-markdown.workspace = true
