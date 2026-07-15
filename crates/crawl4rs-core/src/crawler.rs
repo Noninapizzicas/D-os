@@ -185,6 +185,7 @@ impl Crawler {
                     extracted: None,
                     jsonld: Vec::new(),
                     links: Vec::new(),
+                    intercepted: Vec::new(),
                 });
             }
         }
@@ -231,6 +232,7 @@ impl Crawler {
             extracted,
             jsonld,
             links: output.links,
+            intercepted: page.intercepted,
         })
     }
 

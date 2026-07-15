@@ -114,6 +114,7 @@ impl Fetcher for HttpFetcher {
                 html: String::new(),
                 content_type,
                 bytes: Some(bytes.to_vec()),
+                intercepted: Vec::new(),
             })
         } else {
             let html = resp.text().await.map_err(|e| Error::fetch(url, e))?;
@@ -123,6 +124,7 @@ impl Fetcher for HttpFetcher {
                 html,
                 content_type,
                 bytes: None,
+                intercepted: Vec::new(),
             })
         }
     }

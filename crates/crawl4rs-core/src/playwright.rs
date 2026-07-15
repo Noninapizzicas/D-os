@@ -35,6 +35,8 @@ pub struct PlaywrightFetcher {
     session: Option<SessionCell>,
     /// Guion de interacción (scroll/click/…) aplicado antes de leer el DOM.
     interact: Option<serde_json::Value>,
+    /// Config de interceptación de la API interna (`true` o `{ contiene:[…] }`).
+    intercept: Option<serde_json::Value>,
 }
 
 /// Cuerpo de `POST /abrir`.
@@ -47,6 +49,9 @@ struct AbrirReq<'a> {
     /// Guion de interacción antes de leer el DOM (reservado → ahora).
     #[serde(skip_serializing_if = "Option::is_none")]
     interactuar: Option<&'a serde_json::Value>,
+    /// Interceptar el JSON de la API interna (reservado → ahora).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    interceptar: Option<&'a serde_json::Value>,
 }
 
 /// Cuerpo de `POST /login`.
@@ -77,6 +82,8 @@ struct AbrirResp {
     final_url: Option<String>,
     status: Option<u16>,
     fallo: Option<Fallo>,
+    #[serde(default)]
+    intercepted: Vec<serde_json::Value>,
 }
 
 impl PlaywrightFetcher {
@@ -99,6 +106,7 @@ impl PlaywrightFetcher {
             endpoint,
             session: None,
             interact: None,
+            intercept: None,
         })
     }
 
@@ -113,6 +121,14 @@ impl PlaywrightFetcher {
     /// ejecuta antes de leer el DOM — para scroll infinito, "cargar más", etc.
     pub fn with_interact(mut self, pasos: serde_json::Value) -> Self {
         self.interact = Some(pasos);
+        self
+    }
+
+    /// Activa la interceptación de la API interna. `config` = `true` (todo el
+    /// JSON) o `{ "contiene": ["/api/", "graphql"] }` (filtra por URL). El JSON
+    /// capturado llega en [`FetchedPage::intercepted`] / [`CrawlResult`].
+    pub fn with_intercept(mut self, config: serde_json::Value) -> Self {
+        self.intercept = Some(config);
         self
     }
 
@@ -187,6 +203,7 @@ impl Fetcher for PlaywrightFetcher {
             url,
             sesion: sesion_owned.as_ref(),
             interactuar: self.interact.as_ref(),
+            interceptar: self.intercept.as_ref(),
         })
         .map_err(|e| Error::Browser(format!("no se pudo serializar la petición: {e}")))?;
 
@@ -226,6 +243,7 @@ impl Fetcher for PlaywrightFetcher {
             html: parsed.html.unwrap_or_default(),
             content_type: Some("text/html".to_string()),
             bytes: None,
+            intercepted: parsed.intercepted,
         })
     }
 }
@@ -339,5 +357,23 @@ mod tests {
         let req = rx.recv().unwrap();
         assert!(req.contains("\"interactuar\""), "el cuerpo lleva el guion");
         assert!(req.contains("scroll"), "lleva el paso scroll");
+    }
+
+    #[tokio::test]
+    async fn interceptar_pide_y_devuelve_el_json_capturado() {
+        let (endpoint, rx) = servidor_captura(
+            r#"{"html":"<b>ok</b>","status":200,"intercepted":[{"url":"/api/precios","json":{"precio":9}}]}"#,
+        );
+        let f = PlaywrightFetcher::new(endpoint)
+            .unwrap()
+            .with_intercept(serde_json::json!(true));
+        let page = f.fetch("https://x/").await.unwrap();
+        let req = rx.recv().unwrap();
+        assert!(
+            req.contains("\"interceptar\""),
+            "el cuerpo pide interceptar"
+        );
+        assert_eq!(page.intercepted.len(), 1, "llega el JSON capturado");
+        assert_eq!(page.intercepted[0]["json"]["precio"], 9);
     }
 }

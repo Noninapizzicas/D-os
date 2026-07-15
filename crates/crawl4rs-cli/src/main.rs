@@ -338,10 +338,8 @@ where
 fn playwright_gear() -> Option<Arc<dyn crawl4rs_core::Fetcher>> {
     let url = std::env::var("CRAWL4RS_PLAYWRIGHT_URL").ok()?;
     match crawl4rs_core::PlaywrightFetcher::new(&url) {
-        Ok(mut f) => {
-            if let Some(pasos) = interact_pasos() {
-                f = f.with_interact(pasos);
-            }
+        Ok(f) => {
+            let f = con_interact_intercept(f);
             eprintln!("Marcha larga: Playwright en {url}");
             Some(Arc::new(f))
         }
@@ -363,6 +361,40 @@ fn interact_pasos() -> Option<serde_json::Value> {
     serde_json::from_str(&contents)
         .map_err(|e| eprintln!("AVISO: guion de interacción inválido: {e}"))
         .ok()
+}
+
+/// Config de interceptación desde `CRAWL4RS_INTERCEPT`: `true`/`1` = todo el
+/// JSON; una lista separada por comas = filtra por subcadena de URL.
+#[cfg(feature = "playwright")]
+fn intercept_config() -> Option<serde_json::Value> {
+    let v = std::env::var("CRAWL4RS_INTERCEPT").ok()?;
+    let v = v.trim();
+    if v.is_empty() {
+        return None;
+    }
+    if v.eq_ignore_ascii_case("true") || v == "1" {
+        return Some(serde_json::json!(true));
+    }
+    let contiene: Vec<&str> = v
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    Some(serde_json::json!({ "contiene": contiene }))
+}
+
+/// Aplica interacción e interceptación (env) a la marcha larga Playwright.
+#[cfg(feature = "playwright")]
+fn con_interact_intercept(
+    mut pf: crawl4rs_core::PlaywrightFetcher,
+) -> crawl4rs_core::PlaywrightFetcher {
+    if let Some(guion) = interact_pasos() {
+        pf = pf.with_interact(guion);
+    }
+    if let Some(cfg) = intercept_config() {
+        pf = pf.with_intercept(cfg);
+    }
+    pf
 }
 
 #[cfg(not(feature = "playwright"))]
@@ -396,12 +428,11 @@ fn auto_login_setup() -> Option<AutoLogin> {
         .unwrap_or_else(|| serde_json::json!([]));
 
     let cell = crawl4rs_core::session::empty_session_cell();
-    let mut pf = crawl4rs_core::PlaywrightFetcher::new(&endpoint)
-        .ok()?
-        .with_session_cell(cell.clone());
-    if let Some(guion) = interact_pasos() {
-        pf = pf.with_interact(guion);
-    }
+    let pf = con_interact_intercept(
+        crawl4rs_core::PlaywrightFetcher::new(&endpoint)
+            .ok()?
+            .with_session_cell(cell.clone()),
+    );
     let auth: Arc<dyn crawl4rs_core::session::Authenticator> =
         Arc::new(pf.authenticator(login_url, pasos));
     eprintln!("Auto-login: receta {recipe_path} vía {endpoint}");

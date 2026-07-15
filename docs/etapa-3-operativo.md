@@ -64,9 +64,16 @@ El motor está operativo cuando, con los dos contenedores levantados, puede:
   (marcador generado por JS, no en el fuente). Test en verde.
 - **Desbloquea:** scroll infinito, "cargar más", pestañas, contenido tras clic.
 
-### 4. Interceptar API interna
-- **Wrapper:** `interceptar:true` → captura el JSON que la web se pide a sí
-  misma → `intercepted:[...]`.
+### 4. Interceptar API interna ✅
+- **Wrapper:** `POST /abrir { url, interceptar }` (`true` = todo JSON; `{contiene:
+  ["/api/"]}` = filtra por URL) → captura las respuestas JSON que la página se
+  pide a sí misma → `intercepted:[{url,status,json}]`. Espera `networkidle`
+  para los XHR tardíos.
+- **Crawl4RS:** `PlaywrightFetcher::with_intercept(cfg)`; el JSON sube por
+  `FetchedPage::intercepted` → `CrawlResult::intercepted` (sale en `--json`).
+  **CLI:** `CRAWL4RS_INTERCEPT` = `true`/`1` o lista de subcadenas de URL.
+- **Verificado en vivo:** el `fetch('/api/precios')` de una página se captura
+  limpio (`{producto, precio}`). Test en verde.
 - **Desbloquea:** datos más limpios y completos que el DOM; a veces te saltas el HTML.
 
 ### 5. Endurecimiento anti-bot (freno C)

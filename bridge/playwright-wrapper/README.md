@@ -12,8 +12,8 @@ hace `POST /abrir` con `reqwest`. Ver `docs/contrato-puente-prisma.md`.
 ### Implementado
 
 ```text
-POST /abrir   { "url": "https://…", "sesion"?, "interactuar"?: [ … ] }
-  200 -> { "html": "<!doctype…>", "final_url": "https://…", "status": 200 }
+POST /abrir   { "url": "https://…", "sesion"?, "interactuar"?: [ … ], "interceptar"? }
+  200 -> { "html": "…", "final_url": "…", "status": 200, "intercepted"?: [{url,status,json}] }
   200 -> { "fallo": { "tipo": "timeout|error", "motivo": "…" } }   (no inventa HTML)
   400 -> { "fallo": { "tipo": "peticion_invalida", "motivo": "…" } }
 
@@ -31,13 +31,15 @@ GET  /health  -> { "status": "ok", "playwright_ready": true|false }
   `{ "tipo": "click", "selector": "#entrar" }` ·
   `{ "tipo": "wait", "selector"|"ms": … }` ·
   `{ "tipo": "scroll", "veces": 3, "pausa_ms": 500 }` (scroll infinito / lazy).
+- **`interceptar`** en `/abrir` = `true` (todo JSON) o `{ "contiene": ["/api/"] }`
+  (filtra por URL) → devuelve `intercepted:[{url,status,json}]` con lo que la
+  página pide a su API interna.
 
 ### Declarado, RESERVADO
 
 Las "5 líneas de más": nombradas en el contrato, para que añadirlas sea
 *rellenar*, no *rediseñar*.
 
-- **interceptar** — capturar el JSON de la API interna del sitio.
 - **emular** — dispositivo / geo / idioma.
 - **capturar** — screenshot / pdf.
 

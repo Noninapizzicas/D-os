@@ -90,23 +90,49 @@ async function ejecutarPasos(page, pasos) {
 }
 
 // Abre una página. `sesion` (storageState) → arranca autenticado. `interactuar`
-// → guion de pasos antes de leer el DOM (scroll/click para revelar contenido).
-// RESERVADO: interceptar, emular, capturar.
-async function abrir({ url, sesion, interactuar }) {
+// → guion de pasos antes de leer el DOM. `interceptar` → captura el JSON que la
+// página pide a su API interna (`true` = todo JSON; `{contiene:[…]}` = filtra por
+// URL). RESERVADO: emular, capturar.
+async function abrir({ url, sesion, interactuar, interceptar }) {
   const b = await browser();
   const context = await b.newContext(sesion ? { storageState: sesion } : {});
   try {
     const page = await context.newPage();
+
+    const capturas = [];
+    if (interceptar) {
+      const filtros = Array.isArray(interceptar.contiene) ? interceptar.contiene : null;
+      page.on('response', (resp) => {
+        const ct = resp.headers()['content-type'] || '';
+        if (!ct.includes('json')) return;
+        const u = resp.url();
+        if (filtros && !filtros.some((f) => u.includes(f))) return;
+        // Se aplaza el cuerpo: se resuelve al final (no bloquea la navegación).
+        capturas.push(
+          resp
+            .json()
+            .then((j) => ({ url: u, status: resp.status(), json: j }))
+            .catch(() => null),
+        );
+      });
+    }
+
     const resp = await page.goto(url, {
       waitUntil: 'domcontentloaded',
       timeout: NAV_TIMEOUT,
     });
     await ejecutarPasos(page, interactuar);
+    if (interceptar) {
+      // Deja aterrizar los XHR tardíos antes de recoger.
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+    }
     const html = await page.content();
+    const intercepted = interceptar ? (await Promise.all(capturas)).filter(Boolean) : [];
     return {
       html,
       final_url: page.url(),
       status: resp ? resp.status() : null,
+      intercepted,
     };
   } finally {
     await context.close();
