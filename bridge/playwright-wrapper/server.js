@@ -56,6 +56,41 @@ function browser() {
   return browserPromise;
 }
 
+// UA realista para el modo stealth.
+const UA_STEALTH =
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
+
+// Parche stealth LIGERO (sin plugins pesados): oculta las señales de
+// automatización más comunes. No promete pasar DataDome/Turnstile — es honesto.
+function parcheStealth() {
+  Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  Object.defineProperty(navigator, 'languages', { get: () => ['es-ES', 'es', 'en'] });
+  Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+  window.chrome = window.chrome || { runtime: {} };
+  const q = navigator.permissions && navigator.permissions.query;
+  if (q) {
+    navigator.permissions.query = (p) =>
+      p && p.name === 'notifications'
+        ? Promise.resolve({ state: Notification.permission })
+        : q(p);
+  }
+}
+
+// Crea un contexto con las opciones de la petición: sesión (storageState),
+// proxy ({ server, username?, password? }) y stealth (UA + parche).
+async function crearContexto(b, { sesion, proxy, stealth }) {
+  const opts = {};
+  if (sesion) opts.storageState = sesion;
+  if (proxy) opts.proxy = proxy;
+  if (stealth) {
+    opts.userAgent = UA_STEALTH;
+    opts.locale = 'es-ES';
+  }
+  const context = await b.newContext(opts);
+  if (stealth) await context.addInitScript(parcheStealth);
+  return context;
+}
+
 // Ejecuta un guion de pasos sobre la página. Compartido por login e interacción.
 //   fill   { selector, valor }
 //   click  { selector }
@@ -93,9 +128,9 @@ async function ejecutarPasos(page, pasos) {
 // → guion de pasos antes de leer el DOM. `interceptar` → captura el JSON que la
 // página pide a su API interna (`true` = todo JSON; `{contiene:[…]}` = filtra por
 // URL). RESERVADO: emular, capturar.
-async function abrir({ url, sesion, interactuar, interceptar }) {
+async function abrir({ url, sesion, interactuar, interceptar, stealth, proxy }) {
   const b = await browser();
-  const context = await b.newContext(sesion ? { storageState: sesion } : {});
+  const context = await crearContexto(b, { sesion, proxy, stealth });
   try {
     const page = await context.newPage();
 
@@ -142,9 +177,9 @@ async function abrir({ url, sesion, interactuar, interceptar }) {
 // Ejecuta un guion de pasos (fill/click/wait) y captura la sesión resultante
 // (storageState = cookies + localStorage). No inventa nada: si un paso falla,
 // el llamador recibe el fallo.
-async function login({ url, pasos }) {
+async function login({ url, pasos, stealth, proxy }) {
   const b = await browser();
-  const context = await b.newContext();
+  const context = await crearContexto(b, { proxy, stealth });
   try {
     const page = await context.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT });

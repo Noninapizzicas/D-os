@@ -383,7 +383,25 @@ fn intercept_config() -> Option<serde_json::Value> {
     Some(serde_json::json!({ "contiene": contiene }))
 }
 
-/// Aplica interacción e interceptación (env) a la marcha larga Playwright.
+/// Proxy de la marcha larga desde `CRAWL4RS_PLAYWRIGHT_PROXY` (+ `_USER`/`_PASS`).
+#[cfg(feature = "playwright")]
+fn proxy_config() -> Option<serde_json::Value> {
+    let server = std::env::var("CRAWL4RS_PLAYWRIGHT_PROXY").ok()?;
+    let server = server.trim();
+    if server.is_empty() {
+        return None;
+    }
+    let mut p = serde_json::json!({ "server": server });
+    if let Ok(u) = std::env::var("CRAWL4RS_PLAYWRIGHT_PROXY_USER") {
+        p["username"] = serde_json::json!(u);
+    }
+    if let Ok(pw) = std::env::var("CRAWL4RS_PLAYWRIGHT_PROXY_PASS") {
+        p["password"] = serde_json::json!(pw);
+    }
+    Some(p)
+}
+
+/// Aplica interacción, interceptación, stealth y proxy (env) a la marcha larga.
 #[cfg(feature = "playwright")]
 fn con_interact_intercept(
     mut pf: crawl4rs_core::PlaywrightFetcher,
@@ -393,6 +411,15 @@ fn con_interact_intercept(
     }
     if let Some(cfg) = intercept_config() {
         pf = pf.with_intercept(cfg);
+    }
+    let stealth = std::env::var("CRAWL4RS_STEALTH")
+        .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
+        .unwrap_or(false);
+    if stealth {
+        pf = pf.with_stealth(true);
+    }
+    if let Some(proxy) = proxy_config() {
+        pf = pf.with_proxy(proxy);
     }
     pf
 }

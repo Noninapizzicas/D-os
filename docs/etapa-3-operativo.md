@@ -76,12 +76,18 @@ El motor está operativo cuando, con los dos contenedores levantados, puede:
   limpio (`{producto, precio}`). Test en verde.
 - **Desbloquea:** datos más limpios y completos que el DOM; a veces te saltas el HTML.
 
-### 5. Endurecimiento anti-bot (freno C)
-- **Wrapper:** stealth (ocultar `webdriver`, huella coherente).
-- **Ambos:** capa de **proxy** (residencial para reputación de IP), ya presente
-  en la marcha corta/propia — extenderla a la marcha larga.
-- **Desbloquea:** Cloudflare/medios. Residual honesto: DataDome/Turnstile pueden
-  ganar igual — no se promete.
+### 5. Endurecimiento anti-bot (freno C) ✅
+- **Wrapper:** **stealth ligero** (parche vía `addInitScript`: oculta
+  `navigator.webdriver`, `languages`, `plugins`, `window.chrome`, permissions;
+  + UA y locale realistas). Sin plugins pesados, fiel al ethos.
+- **Proxy** por contexto en la marcha larga: `{ server, username?, password? }`.
+- **Crawl4RS:** `PlaywrightFetcher::with_stealth(bool)` / `with_proxy(cfg)`.
+  **CLI:** `CRAWL4RS_STEALTH=1` · `CRAWL4RS_PLAYWRIGHT_PROXY` (+`_USER`/`_PASS`).
+- **Verificado en vivo:** con stealth, `navigator.webdriver` pasa de `true` a
+  `undefined`. Tests en verde.
+- **Residual honesto:** DataDome/PerimeterX/Turnstile detectan por
+  comportamiento y señales de *headless* incluso con esto — **no se promete**.
+  Para esos, hace falta residencial + ritmo humano, y a veces no hay solución.
 
 ### 6. Emulación
 - **Wrapper:** `emular:{geo|idioma|dispositivo}`.

@@ -37,6 +37,14 @@ pub struct PlaywrightFetcher {
     interact: Option<serde_json::Value>,
     /// Config de interceptación de la API interna (`true` o `{ contiene:[…] }`).
     intercept: Option<serde_json::Value>,
+    /// Modo stealth (oculta señales de automatización).
+    stealth: bool,
+    /// Proxy de salida (`{ server, username?, password? }`).
+    proxy: Option<serde_json::Value>,
+}
+
+fn es_false(b: &bool) -> bool {
+    !*b
 }
 
 /// Cuerpo de `POST /abrir`.
@@ -52,6 +60,12 @@ struct AbrirReq<'a> {
     /// Interceptar el JSON de la API interna (reservado → ahora).
     #[serde(skip_serializing_if = "Option::is_none")]
     interceptar: Option<&'a serde_json::Value>,
+    /// Modo stealth (reservado → ahora).
+    #[serde(skip_serializing_if = "es_false")]
+    stealth: bool,
+    /// Proxy de salida (reservado → ahora).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proxy: Option<&'a serde_json::Value>,
 }
 
 /// Cuerpo de `POST /login`.
@@ -59,6 +73,10 @@ struct AbrirReq<'a> {
 struct LoginReq<'a> {
     url: &'a str,
     pasos: &'a serde_json::Value,
+    #[serde(skip_serializing_if = "es_false")]
+    stealth: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proxy: Option<&'a serde_json::Value>,
 }
 
 /// Respuesta de `POST /login`.
@@ -107,6 +125,8 @@ impl PlaywrightFetcher {
             session: None,
             interact: None,
             intercept: None,
+            stealth: false,
+            proxy: None,
         })
     }
 
@@ -129,6 +149,20 @@ impl PlaywrightFetcher {
     /// capturado llega en [`FetchedPage::intercepted`] / [`CrawlResult`].
     pub fn with_intercept(mut self, config: serde_json::Value) -> Self {
         self.intercept = Some(config);
+        self
+    }
+
+    /// Activa el modo stealth (oculta señales de automatización). Ayuda con
+    /// anti-bot medio; no promete DataDome/Turnstile.
+    pub fn with_stealth(mut self, on: bool) -> Self {
+        self.stealth = on;
+        self
+    }
+
+    /// Configura el proxy de salida de la marcha larga:
+    /// `{ "server": "http://host:puerto", "username"?: …, "password"?: … }`.
+    pub fn with_proxy(mut self, proxy: serde_json::Value) -> Self {
+        self.proxy = Some(proxy);
         self
     }
 
@@ -156,8 +190,13 @@ impl PlaywrightFetcher {
     /// entiende: `fill`/`click`/`wait`) y devuelve la [`Session`] capturada
     /// (`storageState`). El fallo se propaga; no se inventa una sesión.
     pub async fn login(&self, url: &str, pasos: serde_json::Value) -> Result<Session> {
-        let body = serde_json::to_string(&LoginReq { url, pasos: &pasos })
-            .map_err(|e| Error::Browser(format!("no se pudo serializar el login: {e}")))?;
+        let body = serde_json::to_string(&LoginReq {
+            url,
+            pasos: &pasos,
+            stealth: self.stealth,
+            proxy: self.proxy.as_ref(),
+        })
+        .map_err(|e| Error::Browser(format!("no se pudo serializar el login: {e}")))?;
         let resp = self
             .client
             .post(format!("{}/login", self.endpoint))
@@ -204,6 +243,8 @@ impl Fetcher for PlaywrightFetcher {
             sesion: sesion_owned.as_ref(),
             interactuar: self.interact.as_ref(),
             interceptar: self.intercept.as_ref(),
+            stealth: self.stealth,
+            proxy: self.proxy.as_ref(),
         })
         .map_err(|e| Error::Browser(format!("no se pudo serializar la petición: {e}")))?;
 
@@ -375,5 +416,28 @@ mod tests {
         );
         assert_eq!(page.intercepted.len(), 1, "llega el JSON capturado");
         assert_eq!(page.intercepted[0]["json"]["precio"], 9);
+    }
+
+    #[tokio::test]
+    async fn abrir_incluye_stealth_y_proxy() {
+        let (endpoint, rx) = servidor_captura(r#"{"html":"<b>ok</b>","status":200}"#);
+        let f = PlaywrightFetcher::new(endpoint)
+            .unwrap()
+            .with_stealth(true)
+            .with_proxy(serde_json::json!({ "server": "http://p:8080" }));
+        f.fetch("https://x/").await.unwrap();
+        let req = rx.recv().unwrap();
+        assert!(req.contains("\"stealth\":true"), "el cuerpo pide stealth");
+        assert!(req.contains("http://p:8080"), "lleva el server del proxy");
+    }
+
+    #[tokio::test]
+    async fn sin_stealth_ni_proxy_no_van_en_el_cuerpo() {
+        let (endpoint, rx) = servidor_captura(r#"{"html":"<b>ok</b>","status":200}"#);
+        let f = PlaywrightFetcher::new(endpoint).unwrap();
+        f.fetch("https://x/").await.unwrap();
+        let req = rx.recv().unwrap();
+        assert!(!req.contains("stealth"), "sin stealth no se envía");
+        assert!(!req.contains("proxy"), "sin proxy no se envía");
     }
 }

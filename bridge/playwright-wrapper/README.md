@@ -12,7 +12,7 @@ hace `POST /abrir` con `reqwest`. Ver `docs/contrato-puente-prisma.md`.
 ### Implementado
 
 ```text
-POST /abrir   { "url": "https://…", "sesion"?, "interactuar"?: [ … ], "interceptar"? }
+POST /abrir   { "url", "sesion"?, "interactuar"?, "interceptar"?, "stealth"?, "proxy"? }
   200 -> { "html": "…", "final_url": "…", "status": 200, "intercepted"?: [{url,status,json}] }
   200 -> { "fallo": { "tipo": "timeout|error", "motivo": "…" } }   (no inventa HTML)
   400 -> { "fallo": { "tipo": "peticion_invalida", "motivo": "…" } }
@@ -34,6 +34,11 @@ GET  /health  -> { "status": "ok", "playwright_ready": true|false }
 - **`interceptar`** en `/abrir` = `true` (todo JSON) o `{ "contiene": ["/api/"] }`
   (filtra por URL) → devuelve `intercepted:[{url,status,json}]` con lo que la
   página pide a su API interna.
+- **`stealth`** (bool) = oculta señales de automatización (`navigator.webdriver`
+  → `undefined`, etc.) + UA/locale realistas. Ligero; **no** promete
+  DataDome/Turnstile.
+- **`proxy`** = `{ "server": "http://host:puerto", "username"?, "password"? }`
+  aplicado por contexto (también en `/login`).
 
 ### Declarado, RESERVADO
 
