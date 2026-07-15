@@ -7,7 +7,31 @@
 //! - La **marcha corta** (HTTP) solo puede usar las **cookies**: el localStorage
 //!   es estado de cliente y no viaja por HTTP. Degradación honesta.
 
+use std::sync::{Arc, RwLock};
+
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+
+use crate::error::Result;
+
+/// Celda de sesión **compartida**: los fetchers la leen en cada descarga y el
+/// crawler la reescribe tras un re-login. Así el lazo automático refresca la
+/// sesión sin reconstruir nada. Se usa un `RwLock` síncrono: el guard nunca se
+/// mantiene a través de un `await` (se extrae la cookie y se suelta).
+pub type SessionCell = Arc<RwLock<Option<Session>>>;
+
+/// Crea una celda de sesión vacía.
+pub fn empty_session_cell() -> SessionCell {
+    Arc::new(RwLock::new(None))
+}
+
+/// Quien sabe autenticarse y devolver una [`Session`] fresca. El crawler lo
+/// invoca cuando detecta que la sesión se perdió (401 / redirección a login).
+#[async_trait]
+pub trait Authenticator: Send + Sync {
+    /// Hace login y devuelve la sesión capturada. El fallo se propaga.
+    async fn login(&self) -> Result<Session>;
+}
 
 /// Sesión capturada: el `storageState` opaco de Playwright.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

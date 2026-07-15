@@ -37,12 +37,17 @@ El motor está operativo cuando, con los dos contenedores levantados, puede:
   cuerpo, login).
 - **Pendiente de la #2:** cablear la captura en la escalación automática.
 
-### 2. Reutilización de sesión + re-login
+### 2. Reutilización de sesión + re-login ✅
 - ✅ Inyección de la `sesion` en ambas marchas (hecho en #1).
-- **Falta:** el **lazo automático** — que `auto` haga login (marcha larga) al
-  detectar 401 / redirección-a-login (`looks_like_challenge` generalizado a
-  "sesión perdida"), guarde la sesión y la reutilice en el volumen.
+- ✅ **Lazo automático**: celda de sesión compartida (`SessionCell`) que los
+  fetchers leen en caliente; trait `Authenticator` (lo implementa
+  `PlaywrightFetcher::authenticator(url, pasos)`); `Crawler::with_auto_login`.
+  Cuando una descarga parece **sesión perdida** (`looks_like_session_lost`: 401
+  o URL de login), el crawler hace login, **refresca la celda y reintenta una
+  vez** (sin bucles). Test `auto_reloguea_al_perder_sesion_y_reintenta` en verde.
 - **Desbloquea:** volumen autenticado barato y sesiones que caducan sin romperse.
+- **Pendiente:** cablearlo en el CLI/servidor (`--login` receta + wiring), que
+  es trabajo de UX, no de motor.
 
 ### 3. Interacción para revelar
 - **Wrapper:** `POST /abrir { url, interactuar:[scroll|click|fill_form|wait] }`

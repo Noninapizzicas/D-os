@@ -15,6 +15,7 @@
 //!
 //! Ver `docs/contrato-puente-prisma.md`.
 
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -22,7 +23,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 use crate::fetch::{FetchedPage, Fetcher};
-use crate::session::Session;
+use crate::session::{Authenticator, Session, SessionCell};
 
 /// Fetcher que abre la página a través del wrapper HTTP de Playwright.
 #[derive(Clone)]
@@ -30,7 +31,8 @@ pub struct PlaywrightFetcher {
     client: reqwest::Client,
     endpoint: String,
     /// Sesión a reutilizar (`storageState`) en cada `POST /abrir`, si la hay.
-    session: Option<Session>,
+    /// Celda compartida para que el re-login la refresque en caliente.
+    session: Option<SessionCell>,
 }
 
 /// Cuerpo de `POST /abrir`.
@@ -94,11 +96,31 @@ impl PlaywrightFetcher {
         })
     }
 
-    /// Reutiliza una sesión: cada `POST /abrir` la incluye para abrir ya
+    /// Reutiliza una sesión fija: cada `POST /abrir` la incluye para abrir ya
     /// autenticado. Additivo: sin sesión, se comporta igual que antes.
     pub fn with_session(mut self, session: Session) -> Self {
-        self.session = Some(session);
+        self.session = Some(Arc::new(RwLock::new(Some(session))));
         self
+    }
+
+    /// Comparte una celda de sesión (la que el re-login refresca en caliente).
+    pub fn with_session_cell(mut self, cell: SessionCell) -> Self {
+        self.session = Some(cell);
+        self
+    }
+
+    /// Envuelve este fetcher en un [`Authenticator`] atado a una receta de login
+    /// (`url` + `pasos`), para el lazo automático de re-login del crawler.
+    pub fn authenticator(
+        &self,
+        url: impl Into<String>,
+        pasos: serde_json::Value,
+    ) -> PlaywrightAuth {
+        PlaywrightAuth {
+            fetcher: self.clone(),
+            url: url.into(),
+            pasos,
+        }
     }
 
     /// Hace login en `url` ejecutando `pasos` (guion de acciones que el wrapper
@@ -142,9 +164,15 @@ impl PlaywrightFetcher {
 #[async_trait]
 impl Fetcher for PlaywrightFetcher {
     async fn fetch(&self, url: &str) -> Result<FetchedPage> {
+        // Se clona el storageState (el guard no se mantiene a través del await).
+        let sesion_owned: Option<serde_json::Value> = self.session.as_ref().and_then(|cell| {
+            cell.read()
+                .ok()
+                .and_then(|g| g.as_ref().map(|s| s.storage_state.clone()))
+        });
         let body = serde_json::to_string(&AbrirReq {
             url,
-            sesion: self.session.as_ref().map(|s| &s.storage_state),
+            sesion: sesion_owned.as_ref(),
         })
         .map_err(|e| Error::Browser(format!("no se pudo serializar la petición: {e}")))?;
 
@@ -185,6 +213,21 @@ impl Fetcher for PlaywrightFetcher {
             content_type: Some("text/html".to_string()),
             bytes: None,
         })
+    }
+}
+
+/// [`Authenticator`] que hace login por el wrapper con una receta fija.
+#[derive(Clone)]
+pub struct PlaywrightAuth {
+    fetcher: PlaywrightFetcher,
+    url: String,
+    pasos: serde_json::Value,
+}
+
+#[async_trait]
+impl Authenticator for PlaywrightAuth {
+    async fn login(&self) -> Result<Session> {
+        self.fetcher.login(&self.url, self.pasos.clone()).await
     }
 }
 

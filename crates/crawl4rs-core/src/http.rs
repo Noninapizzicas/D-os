@@ -6,13 +6,13 @@
 //! orquestador lo usa como camino por defecto y sólo escala a navegador
 //! cuando hace falta (ver [`crate::config::FetchMode`]).
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
 
 use crate::error::{Error, Result};
 use crate::fetch::{FetchedPage, Fetcher};
-use crate::session::Session;
+use crate::session::{Session, SessionCell};
 
 const DEFAULT_UA: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 \
     (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
@@ -21,8 +21,9 @@ const DEFAULT_UA: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 \
 #[derive(Clone)]
 pub struct HttpFetcher {
     client: reqwest::Client,
-    /// Sesión reutilizada (marcha corta): solo aporta las cookies.
-    session: Option<Arc<Session>>,
+    /// Sesión reutilizada (marcha corta): solo aporta las cookies. Celda
+    /// compartida para que el re-login la refresque en caliente.
+    session: Option<SessionCell>,
 }
 
 impl HttpFetcher {
@@ -55,10 +56,16 @@ impl HttpFetcher {
         })
     }
 
-    /// Reutiliza una sesión: en la marcha corta solo se inyectan sus **cookies**
-    /// (el localStorage no viaja por HTTP). Additivo: sin sesión, igual que antes.
+    /// Reutiliza una sesión fija: en la marcha corta solo se inyectan sus
+    /// **cookies** (el localStorage no viaja por HTTP). Additivo.
     pub fn with_session(mut self, session: Session) -> Self {
-        self.session = Some(Arc::new(session));
+        self.session = Some(Arc::new(RwLock::new(Some(session))));
+        self
+    }
+
+    /// Comparte una celda de sesión (la que el re-login refresca en caliente).
+    pub fn with_session_cell(mut self, cell: SessionCell) -> Self {
+        self.session = Some(cell);
         self
     }
 }
@@ -68,7 +75,13 @@ impl Fetcher for HttpFetcher {
     async fn fetch(&self, url: &str) -> Result<FetchedPage> {
         let mut req = self.client.get(url);
         // Marcha corta autenticada: inyecta las cookies de la sesión, si hay.
-        if let Some(cookie) = self.session.as_ref().and_then(|s| s.cookie_header()) {
+        // El guard se suelta antes del await (solo se extrae la cadena).
+        let cookie = self.session.as_ref().and_then(|cell| {
+            cell.read()
+                .ok()
+                .and_then(|g| g.as_ref().and_then(|s| s.cookie_header()))
+        });
+        if let Some(cookie) = cookie {
             req = req.header(reqwest::header::COOKIE, cookie);
         }
         let resp = req.send().await.map_err(|e| Error::fetch(url, e))?;
