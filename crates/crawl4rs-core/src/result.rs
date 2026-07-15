@@ -33,6 +33,10 @@ pub struct CrawlResult {
     /// Enlaces encontrados en la página, útiles para crawl profundo.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub links: Vec<String>,
+
+    /// JSON interceptado de la API interna (marcha larga con `interceptar`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub intercepted: Vec<Value>,
 }
 
 impl CrawlResult {

@@ -9,7 +9,7 @@ description = "Núcleo de Crawl4RS: orquestación del crawl (fetch → limpieza 
 authors.workspace = true
 
 [features]
-default = ["browser", "cache", "extract", "http", "pdf"]
+default = ["browser", "cache", "extract", "http", "pdf", "playwright"]
 # Fetcher real vía Chromium/CDP, con modo stealth. Desactivable para builds
 # ligeros sin navegador.
 browser = ["dep:chromiumoxide", "dep:tokio", "dep:crawl4rs-stealth"]
@@ -21,6 +21,9 @@ extract = ["dep:crawl4rs-extract"]
 http = ["dep:reqwest", "dep:tokio"]
 # Extracción de texto de PDF digital (sin OCR). Fuera del build `minimal`.
 pdf = ["dep:pdf-extract"]
+# Marcha larga: fetcher que delega en el wrapper HTTP de Playwright (puente
+# determinista; el MCP se reserva para la capa de agente). Opt-in.
+playwright = ["dep:reqwest", "dep:tokio"]
 
 [dependencies]
 crawl4rs-markdown.workspace = true

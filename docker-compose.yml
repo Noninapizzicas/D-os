@@ -1,0 +1,38 @@
+# Despliegue del motor de dos marchas: Crawl4RS (marcha corta) + el wrapper de
+# Playwright (marcha larga). Topología acordada:
+#
+#   - `browser`  → el contenedor que tiene Chromium; el wrapper vive DENTRO.
+#   - `crawl4rs` → por su cuenta, en su propio contenedor.
+#
+# Se hablan por HTTP en la red de Docker; `CRAWL4RS_PLAYWRIGHT_URL` cablea la
+# marcha larga. Con esto, "levanto y funciona": docker compose up.
+services:
+  # La marcha larga. Aquí Chromium ya vive; el wrapper lo usa.
+  browser:
+    build: ./bridge/playwright-wrapper
+    # Si YA tienes un contenedor con Chromium CORRIENDO, no construyas esta
+    # imagen: mete el server.js del wrapper dentro de ese contenedor y ponle
+    # PLAYWRIGHT_CDP_URL apuntando al Chromium en marcha (se conecta, no lanza
+    # un segundo navegador). El contrato no cambia — es cable.
+    #   environment:
+    #     PLAYWRIGHT_CDP_URL: "http://127.0.0.1:9222"
+    expose:
+      - "8100"
+    restart: unless-stopped
+
+  # La marcha corta + orquestación. Por su cuenta.
+  crawl4rs:
+    build: .
+    depends_on:
+      - browser
+    ports:
+      - "8080:8080"
+    environment:
+      # Cablea la escalación: el 'auto' sube a Playwright cuando hace falta.
+      CRAWL4RS_PLAYWRIGHT_URL: "http://browser:8100"
+      # Auto-login opcional: monta la receta y descoméntalo.
+      # CRAWL4RS_LOGIN: "/etc/crawl4rs/login.json"
+      CRAWL4RS_JWT_SECRET: "cambia-esto-en-produccion"
+    # volumes:
+    #   - ./login.json:/etc/crawl4rs/login.json:ro
+    restart: unless-stopped

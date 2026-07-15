@@ -12,6 +12,11 @@ authors.workspace = true
 name = "crawl4rs"
 path = "src/main.rs"
 
+[features]
+default = ["playwright"]
+# Marcha larga por el wrapper HTTP de Playwright (reenvía a crawl4rs-core).
+playwright = ["crawl4rs-core/playwright"]
+
 [dependencies]
 crawl4rs-core = { workspace = true }
 crawl4rs-server = { workspace = true }

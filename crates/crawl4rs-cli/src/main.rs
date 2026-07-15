@@ -297,9 +297,25 @@ where
         HttpFetcher::new()
     };
 
-    let mut crawler = Crawler::new(browser.clone()).with_browser_fetcher(browser.clone());
-    if let Ok(http) = http {
+    // Auto-login (opcional): comparte una celda de sesión entre marchas.
+    let auto = auto_login_setup();
+    // La marcha larga: la de auto-login si hay; si no, Playwright suelto o el
+    // navegador propio.
+    let long_gear: Arc<dyn crawl4rs_core::Fetcher> = match &auto {
+        Some((_, _, pf)) => pf.clone(),
+        None => {
+            playwright_gear().unwrap_or_else(|| browser.clone() as Arc<dyn crawl4rs_core::Fetcher>)
+        }
+    };
+    let mut crawler = Crawler::new(browser.clone()).with_browser_fetcher(long_gear);
+    if let Ok(mut http) = http {
+        if let Some((cell, _, _)) = &auto {
+            http = http.with_session_cell(cell.clone());
+        }
         crawler = crawler.with_http_fetcher(Arc::new(http));
+    }
+    if let Some((cell, auth, _)) = auto {
+        crawler = crawler.with_auto_login(auth, cell);
     }
     if let Some(cache) = cache.clone() {
         crawler = crawler.with_cache(cache);
@@ -313,6 +329,184 @@ where
         browser.shutdown().await;
     }
     out
+}
+
+/// Marcha larga por Playwright, si `CRAWL4RS_PLAYWRIGHT_URL` está definida.
+/// El puente es HTTP fino (el MCP se reserva para la capa de agente). Sin la
+/// variable, se usa el navegador propio (degradación honesta, additivo).
+#[cfg(feature = "playwright")]
+fn playwright_gear() -> Option<Arc<dyn crawl4rs_core::Fetcher>> {
+    let url = std::env::var("CRAWL4RS_PLAYWRIGHT_URL").ok()?;
+    match crawl4rs_core::PlaywrightFetcher::new(&url) {
+        Ok(f) => {
+            let f = con_interact_intercept(f);
+            eprintln!("Marcha larga: Playwright en {url}");
+            Some(Arc::new(f))
+        }
+        Err(e) => {
+            eprintln!("AVISO: Playwright no disponible ({e}); uso el navegador propio.");
+            None
+        }
+    }
+}
+
+/// Guion de interacción (scroll/click/…) desde `CRAWL4RS_INTERACT` (ruta a un
+/// JSON con la lista de pasos). El wrapper lo ejecuta antes de leer el DOM.
+#[cfg(feature = "playwright")]
+fn interact_pasos() -> Option<serde_json::Value> {
+    let path = std::env::var("CRAWL4RS_INTERACT").ok()?;
+    let contents = std::fs::read_to_string(&path)
+        .map_err(|e| eprintln!("AVISO: no pude leer CRAWL4RS_INTERACT ({path}): {e}"))
+        .ok()?;
+    serde_json::from_str(&contents)
+        .map_err(|e| eprintln!("AVISO: guion de interacción inválido: {e}"))
+        .ok()
+}
+
+/// Config de interceptación desde `CRAWL4RS_INTERCEPT`: `true`/`1` = todo el
+/// JSON; una lista separada por comas = filtra por subcadena de URL.
+#[cfg(feature = "playwright")]
+fn intercept_config() -> Option<serde_json::Value> {
+    let v = std::env::var("CRAWL4RS_INTERCEPT").ok()?;
+    let v = v.trim();
+    if v.is_empty() {
+        return None;
+    }
+    if v.eq_ignore_ascii_case("true") || v == "1" {
+        return Some(serde_json::json!(true));
+    }
+    let contiene: Vec<&str> = v
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    Some(serde_json::json!({ "contiene": contiene }))
+}
+
+/// Proxy de la marcha larga desde `CRAWL4RS_PLAYWRIGHT_PROXY` (+ `_USER`/`_PASS`).
+#[cfg(feature = "playwright")]
+fn proxy_config() -> Option<serde_json::Value> {
+    let server = std::env::var("CRAWL4RS_PLAYWRIGHT_PROXY").ok()?;
+    let server = server.trim();
+    if server.is_empty() {
+        return None;
+    }
+    let mut p = serde_json::json!({ "server": server });
+    if let Ok(u) = std::env::var("CRAWL4RS_PLAYWRIGHT_PROXY_USER") {
+        p["username"] = serde_json::json!(u);
+    }
+    if let Ok(pw) = std::env::var("CRAWL4RS_PLAYWRIGHT_PROXY_PASS") {
+        p["password"] = serde_json::json!(pw);
+    }
+    Some(p)
+}
+
+/// Emulación desde envs amigables: `CRAWL4RS_LOCALE`, `CRAWL4RS_TIMEZONE`,
+/// `CRAWL4RS_MOBILE` (1/true) y `CRAWL4RS_GEO` (`lat,lon`).
+#[cfg(feature = "playwright")]
+fn emulate_config() -> Option<serde_json::Value> {
+    let mut e = serde_json::Map::new();
+    if let Ok(l) = std::env::var("CRAWL4RS_LOCALE") {
+        e.insert("locale".into(), serde_json::json!(l));
+    }
+    if let Ok(t) = std::env::var("CRAWL4RS_TIMEZONE") {
+        e.insert("timezone".into(), serde_json::json!(t));
+    }
+    if std::env::var("CRAWL4RS_MOBILE")
+        .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
+        .unwrap_or(false)
+    {
+        e.insert("movil".into(), serde_json::json!(true));
+    }
+    if let Ok(g) = std::env::var("CRAWL4RS_GEO") {
+        if let Some((lat, lon)) = g.split_once(',') {
+            if let (Ok(lat), Ok(lon)) = (lat.trim().parse::<f64>(), lon.trim().parse::<f64>()) {
+                e.insert(
+                    "geo".into(),
+                    serde_json::json!({ "latitude": lat, "longitude": lon }),
+                );
+            }
+        }
+    }
+    if e.is_empty() {
+        None
+    } else {
+        Some(serde_json::Value::Object(e))
+    }
+}
+
+/// Aplica interacción, interceptación, stealth, proxy y emulación (env) a la
+/// marcha larga.
+#[cfg(feature = "playwright")]
+fn con_interact_intercept(
+    mut pf: crawl4rs_core::PlaywrightFetcher,
+) -> crawl4rs_core::PlaywrightFetcher {
+    if let Some(guion) = interact_pasos() {
+        pf = pf.with_interact(guion);
+    }
+    if let Some(cfg) = intercept_config() {
+        pf = pf.with_intercept(cfg);
+    }
+    let stealth = std::env::var("CRAWL4RS_STEALTH")
+        .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
+        .unwrap_or(false);
+    if stealth {
+        pf = pf.with_stealth(true);
+    }
+    if let Some(proxy) = proxy_config() {
+        pf = pf.with_proxy(proxy);
+    }
+    if let Some(emular) = emulate_config() {
+        pf = pf.with_emulate(emular);
+    }
+    pf
+}
+
+#[cfg(not(feature = "playwright"))]
+fn playwright_gear() -> Option<Arc<dyn crawl4rs_core::Fetcher>> {
+    None
+}
+
+/// Auto-login: celda de sesión compartida + autenticador + marcha larga con
+/// esa celda. Requiere `CRAWL4RS_PLAYWRIGHT_URL` **y** `CRAWL4RS_LOGIN` (ruta a
+/// un JSON `{ "url": "…", "pasos": [ … ] }`). Sin ellas, `None` (additivo).
+type AutoLogin = (
+    crawl4rs_core::session::SessionCell,
+    Arc<dyn crawl4rs_core::session::Authenticator>,
+    Arc<dyn crawl4rs_core::Fetcher>,
+);
+
+#[cfg(feature = "playwright")]
+fn auto_login_setup() -> Option<AutoLogin> {
+    let endpoint = std::env::var("CRAWL4RS_PLAYWRIGHT_URL").ok()?;
+    let recipe_path = std::env::var("CRAWL4RS_LOGIN").ok()?;
+    let contents = std::fs::read_to_string(&recipe_path)
+        .map_err(|e| eprintln!("AVISO: no pude leer CRAWL4RS_LOGIN ({recipe_path}): {e}"))
+        .ok()?;
+    let v: serde_json::Value = serde_json::from_str(&contents)
+        .map_err(|e| eprintln!("AVISO: receta de login inválida: {e}"))
+        .ok()?;
+    let login_url = v.get("url").and_then(|x| x.as_str())?.to_string();
+    let pasos = v
+        .get("pasos")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!([]));
+
+    let cell = crawl4rs_core::session::empty_session_cell();
+    let pf = con_interact_intercept(
+        crawl4rs_core::PlaywrightFetcher::new(&endpoint)
+            .ok()?
+            .with_session_cell(cell.clone()),
+    );
+    let auth: Arc<dyn crawl4rs_core::session::Authenticator> =
+        Arc::new(pf.authenticator(login_url, pasos));
+    eprintln!("Auto-login: receta {recipe_path} vía {endpoint}");
+    Some((cell, auth, Arc::new(pf) as Arc<dyn crawl4rs_core::Fetcher>))
+}
+
+#[cfg(not(feature = "playwright"))]
+fn auto_login_setup() -> Option<AutoLogin> {
+    None
 }
 
 async fn run_serve(host: String, port: u16, stealth: bool) -> Result<()> {
@@ -372,11 +566,25 @@ async fn run_serve(host: String, port: u16, stealth: bool) -> Result<()> {
         fetcher = fetcher.with_stealth(Arc::new(StealthEngine::new(StealthConfig::default())));
     }
     let browser = Arc::new(fetcher);
-    // El servidor sirve todos los modos: HTTP rápido + navegador. `mode` de
-    // cada `POST /crawl` decide cuál se usa (auto por defecto).
-    let mut crawler = Crawler::new(browser.clone()).with_browser_fetcher(browser);
-    if let Ok(http) = HttpFetcher::new() {
+    // El servidor sirve todos los modos: HTTP rápido + marcha larga. `mode` de
+    // cada `POST /crawl` decide cuál se usa (auto por defecto). La marcha larga
+    // es Playwright si CRAWL4RS_PLAYWRIGHT_URL está definida; si no, el navegador propio.
+    let auto = auto_login_setup();
+    let long_gear: Arc<dyn crawl4rs_core::Fetcher> = match &auto {
+        Some((_, _, pf)) => pf.clone(),
+        None => {
+            playwright_gear().unwrap_or_else(|| browser.clone() as Arc<dyn crawl4rs_core::Fetcher>)
+        }
+    };
+    let mut crawler = Crawler::new(browser.clone()).with_browser_fetcher(long_gear);
+    if let Ok(mut http) = HttpFetcher::new() {
+        if let Some((cell, _, _)) = &auto {
+            http = http.with_session_cell(cell.clone());
+        }
         crawler = crawler.with_http_fetcher(Arc::new(http));
+    }
+    if let Some((cell, auth_login, _)) = auto {
+        crawler = crawler.with_auto_login(auth_login, cell);
     }
 
     let addr: SocketAddr = format!("{host}:{port}")

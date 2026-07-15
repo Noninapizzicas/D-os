@@ -11,6 +11,7 @@ use crate::config::{CrawlConfig, FetchMode};
 use crate::error::Result;
 use crate::fetch::{FetchedPage, Fetcher};
 use crate::result::CrawlResult;
+use crate::session::{Authenticator, SessionCell};
 
 /// El crawler: coordina el flujo `fetch → limpiar → markdown → fit`.
 ///
@@ -26,6 +27,10 @@ pub struct Crawler {
     http_fetcher: Option<Arc<dyn Fetcher>>,
     browser_fetcher: Option<Arc<dyn Fetcher>>,
     pipeline: MarkdownPipeline,
+    /// Lazo automático de re-login: si la sesión se pierde, autentica y reintenta.
+    authenticator: Option<Arc<dyn Authenticator>>,
+    /// Celda de sesión compartida con los fetchers (la refresca el re-login).
+    session_cell: Option<SessionCell>,
     #[cfg(feature = "cache")]
     cache: Option<crate::cache::ResultCache>,
     #[cfg(feature = "extract")]
@@ -41,11 +46,28 @@ impl Crawler {
             http_fetcher: None,
             browser_fetcher: None,
             pipeline: MarkdownPipeline::new(),
+            authenticator: None,
+            session_cell: None,
             #[cfg(feature = "cache")]
             cache: None,
             #[cfg(feature = "extract")]
             extraction: None,
         }
+    }
+
+    /// Activa el lazo automático de re-login. `authenticator` sabe autenticarse
+    /// (p. ej. `PlaywrightFetcher::authenticator(url, pasos)`); `cell` es la
+    /// **misma** celda de sesión que llevan los fetchers (`with_session_cell`).
+    /// Cuando una descarga parece "sesión perdida" (401 / redirección a login),
+    /// el crawler hace login, refresca la celda y reintenta una vez.
+    pub fn with_auto_login(
+        mut self,
+        authenticator: Arc<dyn Authenticator>,
+        cell: SessionCell,
+    ) -> Self {
+        self.authenticator = Some(authenticator);
+        self.session_cell = Some(cell);
+        self
     }
 
     /// Asocia el fetcher HTTP rápido (usado en modo `fast` y como primer
@@ -125,9 +147,28 @@ impl Crawler {
         }
     }
 
+    /// Descarga con el lazo de re-login: si la sesión parece perdida y hay
+    /// autenticador, hace login, refresca la celda compartida y reintenta una vez.
+    async fn fetch_maybe_relogin(&self, url: &str, mode: FetchMode) -> Result<FetchedPage> {
+        let page = self.fetch_by_mode(url, mode).await?;
+        let (Some(auth), Some(cell)) = (&self.authenticator, &self.session_cell) else {
+            return Ok(page);
+        };
+        if !looks_like_session_lost(&page) {
+            return Ok(page);
+        }
+        debug!(status = ?page.status, "sesión perdida; re-login y reintento");
+        let sesion = auth.login().await?;
+        if let Ok(mut guard) = cell.write() {
+            *guard = Some(sesion);
+        }
+        // Un único reintento con la sesión fresca (evita bucles).
+        self.fetch_by_mode(url, mode).await
+    }
+
     /// Descarga y procesa una URL sin consultar ni escribir la caché.
     async fn crawl_uncached(&self, url: &str, config: &CrawlConfig) -> Result<CrawlResult> {
-        let page = self.fetch_by_mode(url, config.mode).await?;
+        let page = self.fetch_maybe_relogin(url, config.mode).await?;
         debug!(status = ?page.status, bytes = page.html.len(), "página descargada");
 
         // PDF digital: texto → markdown, saltándose el pipeline HTML.
@@ -144,6 +185,7 @@ impl Crawler {
                     extracted: None,
                     jsonld: Vec::new(),
                     links: Vec::new(),
+                    intercepted: Vec::new(),
                 });
             }
         }
@@ -190,6 +232,7 @@ impl Crawler {
             extracted,
             jsonld,
             links: output.links,
+            intercepted: page.intercepted,
         })
     }
 
@@ -260,4 +303,17 @@ fn looks_like_challenge(page: &FetchedPage) -> bool {
     ]
     .iter()
     .any(|m| h.contains(m))
+}
+
+/// Heurística conservadora: ¿la respuesta indica que la **sesión se perdió**?
+/// Un 401, o una redirección cuya URL final cae en una ruta de login. No se
+/// dispara a la ligera: un falso positivo gastaría un login de más.
+fn looks_like_session_lost(page: &FetchedPage) -> bool {
+    if page.status == Some(401) {
+        return true;
+    }
+    let u = page.url.to_ascii_lowercase();
+    ["/login", "/signin", "/sign-in", "/auth/", "/accounts/login"]
+        .iter()
+        .any(|m| u.contains(m))
 }

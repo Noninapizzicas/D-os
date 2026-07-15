@@ -24,6 +24,9 @@ pub struct FetchedPage {
     pub content_type: Option<String>,
     /// Bytes crudos cuando el contenido no es HTML (p. ej. PDF).
     pub bytes: Option<Vec<u8>>,
+    /// JSON interceptado de la API interna del sitio (solo la marcha larga con
+    /// `interceptar`). Vacío por defecto.
+    pub intercepted: Vec<serde_json::Value>,
 }
 
 impl FetchedPage {

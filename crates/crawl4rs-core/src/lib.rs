@@ -29,7 +29,10 @@ pub mod fetch;
 pub mod http;
 #[cfg(feature = "pdf")]
 pub mod pdf;
+#[cfg(feature = "playwright")]
+pub mod playwright;
 pub mod result;
+pub mod session;
 
 #[cfg(feature = "browser")]
 pub use browser::{
@@ -51,7 +54,10 @@ pub use fetch::BrowserFetcher;
 pub use fetch::{FetchedPage, Fetcher, StaticFetcher};
 #[cfg(feature = "http")]
 pub use http::HttpFetcher;
+#[cfg(feature = "playwright")]
+pub use playwright::PlaywrightFetcher;
 pub use result::CrawlResult;
+pub use session::Session;
 
 #[cfg(test)]
 mod tests {
@@ -91,9 +97,86 @@ mod tests {
         )
     }
 
+    /// Fetcher que exige sesión: sin ella devuelve 401; con ella, el contenido.
+    struct SessionGatedFetcher {
+        cell: crate::session::SessionCell,
+        html: String,
+        calls: Arc<AtomicUsize>,
+    }
+
+    #[async_trait::async_trait]
+    impl Fetcher for SessionGatedFetcher {
+        async fn fetch(&self, url: &str) -> Result<FetchedPage> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            let tiene = self.cell.read().map(|g| g.is_some()).unwrap_or(false);
+            Ok(FetchedPage {
+                url: url.to_string(),
+                status: Some(if tiene { 200 } else { 401 }),
+                html: if tiene {
+                    self.html.clone()
+                } else {
+                    "<html><body>necesitas iniciar sesión</body></html>".into()
+                },
+                ..Default::default()
+            })
+        }
+    }
+
+    /// Autenticador de prueba: cuenta los logins y devuelve una sesión con cookie.
+    struct FakeAuth {
+        logins: Arc<AtomicUsize>,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::session::Authenticator for FakeAuth {
+        async fn login(&self) -> Result<crate::session::Session> {
+            self.logins.fetch_add(1, Ordering::SeqCst);
+            Ok(crate::session::Session::from_storage_state(
+                serde_json::json!({ "cookies": [{ "name": "sid", "value": "ok" }] }),
+            ))
+        }
+    }
+
     const OK_HTML: &str = "<html><body><article><h1>Contenido</h1><p>Un párrafo \
         con suficientes palabras para superar el umbral por defecto del pipeline.</p>\
         </article></body></html>";
+
+    #[tokio::test]
+    async fn auto_reloguea_al_perder_sesion_y_reintenta() {
+        // Sin sesión → 401; el crawler reloguea, refresca la celda y reintenta.
+        let cell = crate::session::empty_session_cell();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let gated = Arc::new(SessionGatedFetcher {
+            cell: cell.clone(),
+            html: OK_HTML.to_string(),
+            calls: calls.clone(),
+        });
+        let logins = Arc::new(AtomicUsize::new(0));
+        let auth = Arc::new(FakeAuth {
+            logins: logins.clone(),
+        });
+
+        let crawler = Crawler::new(gated.clone())
+            .with_http_fetcher(gated.clone())
+            .with_auto_login(auth, cell);
+
+        let r = crawler
+            .crawl(
+                "https://x.test/panel",
+                &CrawlConfig {
+                    mode: FetchMode::Auto,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert!(
+            r.markdown.contains("Contenido"),
+            "tras el re-login ve el contenido"
+        );
+        assert_eq!(logins.load(Ordering::SeqCst), 1, "un solo login");
+        assert_eq!(calls.load(Ordering::SeqCst), 2, "fetch: 401 y luego 200");
+    }
 
     #[tokio::test]
     async fn auto_escala_a_navegador_ante_challenge() {
