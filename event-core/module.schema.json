@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://d-os/event-core/module.schema.json",
+  "title": "ModuleManifest",
+  "description": "Contrato del module.json que describe un ModuloEventCore. El loader lee events.subscribes para cablear las suscripciones declarativamente.",
+  "type": "object",
+  "required": ["name", "prefix"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre unico del modulo (kebab-case)."
+    },
+    "prefix": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Prefijo de los nombres de evento del modulo: <prefix>.<entity>.<verb>."
+    },
+    "language": {
+      "type": "object",
+      "description": "Idioma del modulo (contrato naming).",
+      "properties": {
+        "verbs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Whitelist de verbos en past participle permitidos al emitir."
+        }
+      },
+      "additionalProperties": true
+    },
+    "events": {
+      "type": "object",
+      "properties": {
+        "subscribes": {
+          "type": "array",
+          "description": "Suscripciones que el loader cablea al cargar el modulo.",
+          "items": {
+            "type": "object",
+            "required": ["name", "handler"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Nombre de evento con puntos; admite wildcards (+, #)."
+              },
+              "handler": {
+                "type": "string",
+                "description": "Nombre del metodo del modulo que reacciona al evento."
+              },
+              "categoria": {
+                "$ref": "evento.schema.json#/$defs/categoria",
+                "default": "events"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "publishes": {
+          "type": "array",
+          "description": "Eventos que el modulo declara que emite (documental).",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

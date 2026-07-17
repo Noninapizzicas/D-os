@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://d-os/event-core/evento.schema.json",
+  "title": "Evento",
+  "description": "Contrato del payload de un evento del bus event-core. Fuente: lenguaje/events.fiel.json v2.0.0. El payload es siempre un objeto; los campos transversales son comunes, el resto pertenecen al dominio del evento y deben ser JSON-serializables.",
+  "type": "object",
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601. Recomendado siempre. Si falta al publicar, el bus lo añade."
+    },
+    "correlation_id": {
+      "type": "string",
+      "description": "Obligatorio en respuestas. Se propaga sin cambiar a lo largo de una conversacion request/response."
+    },
+    "project_id": {
+      "type": "string",
+      "description": "Obligatorio si el dominio es multi-tenant."
+    },
+    "source": {
+      "type": "string",
+      "enum": ["cli", "ui", "auto", "agent"],
+      "description": "Opcional. Origen logico que provoco el evento."
+    }
+  },
+  "required": ["timestamp"],
+  "additionalProperties": true,
+  "$defs": {
+    "categoria": {
+      "description": "closed_enum de categorias de topic con su QoS y retain (events.fiel.json).",
+      "type": "string",
+      "enum": [
+        "events",
+        "state",
+        "commands",
+        "api/request",
+        "api/response",
+        "status",
+        "heartbeat",
+        "logs",
+        "ui/request",
+        "ui/response"
+      ]
+    }
+  }
+}
